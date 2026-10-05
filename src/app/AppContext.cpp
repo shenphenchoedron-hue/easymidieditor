@@ -180,6 +180,63 @@ bool AppContext::importMidi(const juce::File& f, juce::String& error)
     model::Project imported;
     auto r = io::MidiFile::readFile(f.getFullPathName().toStdString(), imported, true);
     if (!r.ok) { error = r.error; return false; }
+    addImportedTracks(imported);
+    return true;
+}
+
+namespace {
+// .mxl is a zip; META-INF/container.xml names the score, otherwise take the first .musicxml/.xml.
+bool readMxl(const juce::File& f, std::string& xml, juce::String& error)
+{
+    juce::ZipFile zip(f);
+    if (zip.getNumEntries() == 0) { error = "Not a valid .mxl (zip) file"; return false; }
+    auto readEntry = [&](const juce::String& name, juce::String& out) {
+        const int i = zip.getIndexOfFileName(name);
+        if (i < 0) return false;
+        std::unique_ptr<juce::InputStream> in(zip.createStreamForEntry(i));
+        if (!in) return false;
+        juce::MemoryBlock mb;
+        in->readIntoMemoryBlock(mb);
+        out = juce::String::fromUTF8((const char*)mb.getData(), (int)mb.getSize());
+        return true;
+    };
+    juce::String rootPath, container;
+    if (readEntry("META-INF/container.xml", container))
+        if (auto doc = juce::parseXML(container))
+            if (auto* rf = doc->getChildByName("rootfiles"))
+                if (auto* first = rf->getChildByName("rootfile")) rootPath = first->getStringAttribute("full-path");
+    if (rootPath.isEmpty())
+        for (int i = 0; i < zip.getNumEntries(); ++i) {
+            const auto name = zip.getEntry(i)->filename;
+            if (!name.startsWith("META-INF") && (name.endsWithIgnoreCase(".musicxml") || name.endsWithIgnoreCase(".xml"))) { rootPath = name; break; }
+        }
+    juce::String content;
+    if (rootPath.isEmpty() || !readEntry(rootPath, content)) { error = "No score found inside the .mxl file"; return false; }
+    xml = content.toStdString();
+    return true;
+}
+} // namespace
+
+bool AppContext::importMusicXml(const juce::File& f, juce::String& error)
+{
+    std::string xml;
+    if (f.hasFileExtension("mxl")) {
+        if (!readMxl(f, xml, error)) return false;
+    } else {
+        juce::MemoryBlock mb;
+        if (!f.loadFileAsData(mb)) { error = "Cannot read " + f.getFullPathName(); return false; }
+        xml.assign((const char*)mb.getData(), mb.getSize());
+    }
+    model::Project imported;
+    auto r = io::MusicXml::read(xml, imported, true);
+    if (!r.ok) { error = r.error; return false; }
+    addImportedTracks(imported);
+    if (r.hasKey) setHarmony(r.harmony.root, r.harmony.scaleId, project.harmony.chordMode);
+    return true;
+}
+
+void AppContext::addImportedTracks(const model::Project& imported)
+{
     // Imported tracks are added through undoable commands.
     project.tempoBpm = imported.tempoBpm;
     project.timeSig = imported.timeSig;
@@ -193,10 +250,9 @@ bool AppContext::importMidi(const juce::File& f, juce::String& error)
             dst->plugin = defaultInstrument();
             std::vector<model::Note> notes(src->notes().begin(), src->notes().end());
             for (auto& n : notes) n.id = 0;
-            undo.perform(std::make_unique<model::AddNotesCommand>(dst->id(), notes, "Import MIDI"));
+            undo.perform(std::make_unique<model::AddNotesCommand>(dst->id(), notes, "Import"));
         }
     }
-    return true;
 }
 
 bool AppContext::exportMidi(const juce::File& f, juce::String& error)

@@ -37,6 +37,7 @@ public:
     bool importMidi(const juce::File&, juce::String& error);
     bool exportMidi(const juce::File&, juce::String& error);
     bool exportMusicXml(const juce::File&, juce::String& error);
+    bool importMusicXml(const juce::File&, juce::String& error); // .musicxml, .xml, .mxl
     juce::File currentFile;
     bool hasUnsavedChanges() const { return dirty; }
 
@@ -86,6 +87,7 @@ public:
 private:
     void onModelChanged();
     void syncEngine();
+    void addImportedTracks(const model::Project& imported); // undoable; adopts tempo + time signature
     void captureAllPluginStates();
     void handleMidi(const juce::MidiMessage&);
     void sendLive(const std::vector<input::OutputEvent>&);

@@ -7,7 +7,7 @@ namespace mc::gui {
 
 namespace {
 enum MenuId {
-    New = 1, Open, Save, SaveAs, ImportMidi, ExportMidi, ExportMusicXml, Quit,
+    New = 1, Open, Save, SaveAs, ImportMidi, ImportMusicXml, ExportMidi, ExportMusicXml, Quit,
     Undo = 100, Redo, Cut, Copy, Paste, Delete, SelectAll, AddTrack, DeleteTrack,
     Settings = 200, Plugins, Rescan
 };
@@ -108,6 +108,7 @@ juce::PopupMenu MainComponent::getMenuForIndex(int idx, const juce::String&)
         m.addItem(SaveAs, "Save as...");
         m.addSeparator();
         m.addItem(ImportMidi, "Import MIDI file...");
+        m.addItem(ImportMusicXml, "Import MusicXML (MuseScore)...");
         m.addItem(ExportMidi, "Export MIDI file...");
         m.addItem(ExportMusicXml, "Export MusicXML (MuseScore)...");
         m.addSeparator();
@@ -140,6 +141,7 @@ void MainComponent::menuItemSelected(int id, int)
         case Save: save(); break;
         case SaveAs: saveDialog(); break;
         case ImportMidi: importDialog(); break;
+        case ImportMusicXml: importMusicXmlDialog(); break;
         case ExportMidi: exportDialog(); break;
         case ExportMusicXml: exportMusicXmlDialog(); break;
         case Quit: juce::JUCEApplication::getInstance()->systemRequestedQuit(); break;
@@ -241,6 +243,18 @@ void MainComponent::exportDialog()
         if (!f.hasFileExtension("mid")) f = f.withFileExtension("mid");
         juce::String err;
         if (!app.exportMidi(f, err)) showError("Export failed:\n" + err);
+    });
+}
+
+void MainComponent::importMusicXmlDialog()
+{
+    chooser = std::make_unique<juce::FileChooser>("Import MusicXML", app.settings.lastDirectory(), "*.musicxml;*.mxl;*.xml");
+    chooser->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles, [this](const juce::FileChooser& fc) {
+        auto f = fc.getResult();
+        if (f == juce::File()) return;
+        app.settings.setLastDirectory(f.getParentDirectory());
+        juce::String err;
+        if (!app.importMusicXml(f, err)) showError("Import failed:\n" + err);
     });
 }
 
