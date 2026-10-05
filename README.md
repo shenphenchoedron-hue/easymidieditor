@@ -1,6 +1,31 @@
-# MIDI Composer
+# Easy MIDI Composer
 
-Cross-platform MIDI composition app (C++20, JUCE 8, CMake) with scale-based Chord Input Mode.
+**Easy Midi Composer** is a lightweight, cross-platform MIDI composition app built with C++20, JUCE 8 and CMake.
+
+It is designed for quickly creating MIDI files, musical ideas and complete MIDI compositions without having to open a large and complex DAW.
+
+The idea is simple: compose and edit MIDI in a focused environment, export the result as a standard MIDI file, and then import it into your DAW for instrumentation, production, mixing and further arrangement.
+
+Easy Midi Composer is not intended to replace a DAW. Instead, it provides a fast and uncomplicated workspace for the part that often comes before the DAW: writing the music.
+
+The application includes a piano-roll editor, scale-aware composition tools and a Chord Input Mode designed to make melodies, harmonies and chord progressions quick to create.
+
+## Why Easy Midi Composer?
+
+Sometimes you just want to create a melody, chord progression or MIDI arrangement without loading an entire production environment.
+
+Easy Midi Composer focuses specifically on MIDI composition:
+
+- Quickly sketch melodies and musical ideas.
+- Create chords directly in the piano roll.
+- Compose using scales and scale-aware chord tools.
+- Build MIDI arrangements without configuring a full DAW project.
+- Export standard MIDI files for use in your preferred DAW.
+- Keep composition separate from sound design, mixing and production.
+
+The goal is to make MIDI composition feel immediate: open the application, write the music, export the MIDI file, and continue working with it wherever you want.
+
+**Open → Compose → Export MIDI → Import into DAW.**
 
 ## Build
 ```
