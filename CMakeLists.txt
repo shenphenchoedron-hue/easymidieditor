@@ -5,6 +5,9 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+# Windows: link the C++ runtime statically so users need no VC++ redistributable.
+set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+
 option(MC_BUILD_APP   "Build the JUCE desktop application" ON)
 option(MC_BUILD_TESTS "Build unit tests for the core library" ON)
 

@@ -1,6 +1,7 @@
 #pragma once
 // Visual theme: palette + LookAndFeel. Purely presentational; no behaviour.
 #include <juce_gui_extra/juce_gui_extra.h>
+#include <array>
 
 namespace mc::gui::theme {
 
