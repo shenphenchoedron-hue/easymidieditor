@@ -12,6 +12,7 @@ public:
     explicit MainComponent(AppContext&);
     ~MainComponent() override;
     void resized() override;
+    void paint(juce::Graphics&) override;
     bool keyPressed(const juce::KeyPress&) override;
 
     juce::StringArray getMenuBarNames() override;

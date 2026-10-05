@@ -1,4 +1,5 @@
 #include "gui/PluginBrowser.h"
+#include "gui/Theme.h"
 
 namespace mc::gui {
 
@@ -28,7 +29,7 @@ private:
 class BrowserWindow final : public juce::DocumentWindow {
 public:
     BrowserWindow(AppContext& app, PluginBrowser::Choose choose)
-        : DocumentWindow("Instrument plugins", juce::Colours::darkgrey, closeButton)
+        : DocumentWindow("Instrument plugins", theme::col::appBg, closeButton)
     {
         setUsingNativeTitleBar(true);
         setContentOwned(new PluginBrowser(app, [this, choose](const plugins::PluginInfo& i) {
@@ -80,13 +81,20 @@ PluginBrowser::PluginBrowser(AppContext& a, Choose c) : app(a), onChoose(std::mo
     h.addColumn("Category", Category, 140);
     h.setSortColumnId(Name, true);
     for (juce::Component* comp : std::initializer_list<juce::Component*>{&formatFilter, &search, &rescanBtn, &chooseBtn, &table, &status}) addAndMakeVisible(comp);
+    status.setColour(juce::Label::textColourId, theme::col::textDim);
+    status.setFont(theme::uiFont(12.5f));
+    table.setRowHeight(26);
+    table.setColour(juce::ListBox::outlineColourId, theme::col::border);
+    table.setOutlineThickness(1);
     refilter();
     setSize(720, 480);
 }
 
+void PluginBrowser::paint(juce::Graphics& g) { g.fillAll(theme::col::panel); }
+
 void PluginBrowser::resized()
 {
-    auto r = getLocalBounds().reduced(6);
+    auto r = getLocalBounds().reduced(theme::gap);
     auto top = r.removeFromTop(28);
     formatFilter.setBounds(top.removeFromLeft(150));
     top.removeFromLeft(6);
@@ -125,7 +133,7 @@ void PluginBrowser::refilter()
 
 void PluginBrowser::paintRowBackground(juce::Graphics& g, int row, int, int, bool selected)
 {
-    g.fillAll(selected ? juce::Colour(0xff3a6ea5) : (row % 2 ? juce::Colour(0xff2a2d33) : juce::Colour(0xff25282d)));
+    g.fillAll(selected ? theme::col::accentSoft : (row % 2 ? theme::col::panel : theme::col::field));
 }
 
 void PluginBrowser::paintCell(juce::Graphics& g, int row, int col, int w, int h, bool)
@@ -136,8 +144,9 @@ void PluginBrowser::paintCell(juce::Graphics& g, int row, int col, int w, int h,
     if (col == Manufacturer) s = &p.manufacturer;
     else if (col == Format) s = &p.format;
     else if (col == Category) s = &p.category;
-    g.setColour(juce::Colours::white);
-    g.drawText(juce::String(*s), 4, 0, w - 8, h, juce::Justification::centredLeft);
+    g.setColour(col == Name ? theme::col::text : theme::col::textDim);
+    g.setFont(theme::uiFont(13.5f, col == Name));
+    g.drawText(juce::String(*s), 6, 0, w - 10, h, juce::Justification::centredLeft);
 }
 
 void PluginBrowser::cellDoubleClicked(int row, int, const juce::MouseEvent&)

@@ -2,9 +2,13 @@ juce_add_gui_app(MidiComposer
     PRODUCT_NAME "MIDI Composer"
     COMPANY_NAME "MidiComposer"
     BUNDLE_ID com.midicomposer.app
+    ICON_BIG ${CMAKE_SOURCE_DIR}/resources/icon.png
     MICROPHONE_PERMISSION_ENABLED FALSE)
 
+juce_add_binary_data(MidiComposerData SOURCES ${CMAKE_SOURCE_DIR}/resources/logo.svg)
+
 target_sources(MidiComposer PRIVATE
+    gui/Theme.cpp
     Main.cpp
     AppContext.cpp
     settings/Settings.cpp
@@ -47,6 +51,7 @@ target_compile_definitions(MidiComposer PRIVATE
 
 target_link_libraries(MidiComposer PRIVATE
     mc_core
+    MidiComposerData
     juce::juce_audio_utils
     juce::juce_audio_processors
     juce::juce_audio_devices

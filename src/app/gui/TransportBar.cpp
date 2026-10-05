@@ -1,5 +1,6 @@
 #include "gui/TransportBar.h"
 #include "sequencer/Timing.h"
+#include "gui/Theme.h"
 
 namespace mc::gui {
 
@@ -14,15 +15,25 @@ TransportBar::TransportBar(AppContext& a) : app(a)
     playBtn.onClick = [this] { app.play(); };
     stopBtn.onClick = [this] { app.stop(); };
     recBtn.onClick = [this] { app.toggleRecord(); };
-    recBtn.setColour(juce::TextButton::buttonOnColourId, juce::Colour(0xffc03030));
-    playBtn.setColour(juce::TextButton::buttonOnColourId, juce::Colour(0xff30a050));
+    theme::setStyle(playBtn, theme::stylePlay);
+    theme::setStyle(recBtn, theme::styleRecord);
+    theme::setStyle(stopBtn, theme::styleTransport);
+    theme::setStyle(toStart, theme::styleTransport);
+    theme::setStyle(loopBtn, theme::styleTransport);
+    for (auto* l : {&bpmLabel, &sigLabel, &loopLabel, &gridLabel}) {
+        l->setFont(theme::uiFont(12.0f));
+        l->setColour(juce::Label::textColourId, theme::col::textDim);
+        l->setJustificationType(juce::Justification::centredRight);
+        l->setBorderSize({0, 0, 0, 2});
+    }
+    logo = theme::createLogo();
     loopBtn.setClickingTogglesState(true);
     loopBtn.onClick = [this] { app.setLoop(loopBtn.getToggleState(), app.project.loopStart, app.project.loopEnd); };
 
-    position.setFont(juce::FontOptions(18.0f, juce::Font::bold));
+    position.setFont(theme::monoFont(17.0f));
     position.setJustificationType(juce::Justification::centred);
-    position.setColour(juce::Label::backgroundColourId, juce::Colours::black);
-    position.setColour(juce::Label::textColourId, juce::Colour(0xff7fffa0));
+    position.setColour(juce::Label::backgroundColourId, juce::Colours::transparentBlack);
+    position.setColour(juce::Label::textColourId, theme::col::displayText);
 
     bpm.setRange(20, 400, 1);
     bpm.onValueChange = [this] { if (bpm.getValue() != app.project.tempoBpm) app.setTempo(bpm.getValue()); };
@@ -63,19 +74,41 @@ TransportBar::TransportBar(AppContext& a) : app(a)
 
 TransportBar::~TransportBar() { app.removeChangeListener(this); }
 
-void TransportBar::paint(juce::Graphics& g) { g.fillAll(juce::Colour(0xff33373e)); }
+void TransportBar::paint(juce::Graphics& g)
+{
+    g.fillAll(theme::col::panel);
+    if (logo) logo->drawWithin(g, logoArea, juce::RectanglePlacement::centred, 1.0f);
+    // transport display
+    g.setColour(theme::col::display);
+    g.fillRoundedRectangle(position.getBounds().toFloat(), theme::radius);
+    g.setColour(theme::col::displayText.withAlpha(0.18f));
+    g.drawRoundedRectangle(position.getBounds().toFloat().reduced(0.5f), theme::radius, 1.0f);
+    // group separators
+    g.setColour(theme::col::borderSoft);
+    for (int x : separators) g.drawVerticalLine(x, 10.0f, (float)getHeight() - 10.0f);
+}
 
 void TransportBar::resized()
 {
-    auto r = getLocalBounds().reduced(4);
-    auto place = [&](juce::Component& c, int w) { c.setBounds(r.removeFromLeft(w)); r.removeFromLeft(4); };
-    place(toStart, 34); place(playBtn, 52); place(stopBtn, 52); place(recBtn, 46); place(loopBtn, 50);
-    place(position, 130);
-    place(bpmLabel, 34); place(bpm, 100);
-    place(sigLabel, 28); place(sigNum, 52); place(sigDen, 52);
-    place(loopLabel, 64); place(loopStartBar, 90); place(loopEndBar, 90);
-    place(gridLabel, 34); place(gridBox, 74); place(snapBtn, 60);
-    place(undoBtn, 50); place(redoBtn, 50);
+    using namespace theme;
+    auto r = getLocalBounds().reduced(gap, 7);
+    separators.clear();
+    logoArea = r.removeFromLeft(30).toFloat();
+    r.removeFromLeft(gapGroup);
+    auto place = [&](juce::Component& c, int w, int after = gapS) { c.setBounds(r.removeFromLeft(w)); r.removeFromLeft(after); };
+    auto group = [&] { r.removeFromLeft(gapS); separators.push_back(r.getX()); r.removeFromLeft(gapGroup - gapS + 2); };
+    place(toStart, 36); place(playBtn, 58); place(stopBtn, 58); place(recBtn, 52); place(loopBtn, 54, gap);
+    place(position, 136);
+    group();
+    place(bpmLabel, 32); place(bpm, 96);
+    group();
+    place(sigLabel, 26); place(sigNum, 52); place(sigDen, 52);
+    group();
+    place(loopLabel, 62); place(loopStartBar, 88); place(loopEndBar, 88);
+    group();
+    place(gridLabel, 32); place(gridBox, 78, gap); place(snapBtn, 64);
+    group();
+    place(undoBtn, 54); place(redoBtn, 54);
 }
 
 void TransportBar::refreshPosition()

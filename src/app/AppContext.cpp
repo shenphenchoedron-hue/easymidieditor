@@ -9,7 +9,7 @@ namespace {
 class PluginEditorWindow final : public juce::DocumentWindow {
 public:
     PluginEditorWindow(const juce::String& title, juce::Component* editor, std::function<void()> onClose)
-        : DocumentWindow(title, juce::Colours::darkgrey, DocumentWindow::closeButton), closeFn(std::move(onClose))
+        : DocumentWindow(title, juce::Colour(0xffe9edf2), DocumentWindow::closeButton), closeFn(std::move(onClose))
     {
         setUsingNativeTitleBar(true);
         setContentOwned(editor, true);

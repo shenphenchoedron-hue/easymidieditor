@@ -9,6 +9,7 @@ public:
     using Choose = std::function<void(const plugins::PluginInfo&)>;
     PluginBrowser(AppContext&, Choose onChoose);
     void resized() override;
+    void paint(juce::Graphics&) override;
 
     static void show(AppContext&, Choose onChoose);
     static void rescanWithProgress(AppContext&, std::function<void()> done);

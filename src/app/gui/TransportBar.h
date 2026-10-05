@@ -24,6 +24,9 @@ private:
     juce::Slider loopEndBar{juce::Slider::IncDecButtons, juce::Slider::TextBoxLeft};
     juce::ToggleButton snapBtn{"Snap"};
     juce::TextButton undoBtn{"Undo"}, redoBtn{"Redo"};
+    std::unique_ptr<juce::Drawable> logo;
+    juce::Rectangle<float> logoArea;
+    std::vector<int> separators;
 };
 
 } // namespace mc::gui

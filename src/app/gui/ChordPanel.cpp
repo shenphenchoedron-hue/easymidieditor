@@ -1,5 +1,6 @@
 #include "gui/ChordPanel.h"
 #include "theory/Scale.h"
+#include "gui/Theme.h"
 
 namespace mc::gui {
 
@@ -11,7 +12,6 @@ ChordPanel::ChordPanel(AppContext& a) : app(a)
     root.onChange = [this] { push(); };
     scale.onChange = [this] { push(); };
     chordMode.setClickingTogglesState(true);
-    chordMode.setColour(juce::TextButton::buttonOnColourId, juce::Colour(0xff2f8f4f));
     chordMode.onClick = [this] { push(); };
     chordMode.setTooltip("Chord Input Mode: played/clicked notes become diatonic chords of the selected scale");
 
@@ -19,13 +19,21 @@ ChordPanel::ChordPanel(AppContext& a) : app(a)
         auto& b = mods[(size_t)i];
         b.setButtonText(input::modifierName((input::Modifier)i));
         b.setClickingTogglesState(true);
-        b.setColour(juce::TextButton::buttonOnColourId, juce::Colour(0xffd08020));
+        b.setColour(juce::TextButton::buttonOnColourId, theme::col::accent2);
         b.setTooltip("Latch modifier (or hold its key on the MIDI keyboard)");
         b.onClick = [this, i] { app.setModifierLatched((input::Modifier)i, !app.isModifierLatched((input::Modifier)i)); };
         addAndMakeVisible(b);
     }
-    chordLabel.setFont(juce::FontOptions(20.0f, juce::Font::bold));
-    chordLabel.setColour(juce::Label::textColourId, juce::Colour(0xffffd27f));
+    chordLabel.setFont(theme::uiFont(15.0f, true));
+    chordLabel.setColour(juce::Label::textColourId, juce::Colour(0xff6b4a12));
+    chordLabel.setJustificationType(juce::Justification::centredLeft);
+    chordLabel.setBorderSize({0, 10, 0, 10});
+    for (auto* l : {&rootLabel, &scaleLabel, &modsLabel}) {
+        l->setFont(theme::uiFont(12.0f));
+        l->setColour(juce::Label::textColourId, theme::col::textDim);
+        l->setJustificationType(juce::Justification::centredRight);
+        l->setBorderSize({0, 0, 0, 2});
+    }
     for (juce::Component* c : std::initializer_list<juce::Component*>{&rootLabel, &root, &scaleLabel, &scale, &chordMode, &modsLabel, &chordLabel})
         addAndMakeVisible(c);
     app.addChangeListener(this);
@@ -34,19 +42,33 @@ ChordPanel::ChordPanel(AppContext& a) : app(a)
 
 ChordPanel::~ChordPanel() { app.removeChangeListener(this); }
 
-void ChordPanel::paint(juce::Graphics& g) { g.fillAll(juce::Colour(0xff2b2f36)); }
+void ChordPanel::paint(juce::Graphics& g)
+{
+    g.fillAll(juce::Colour(0xffeef1f4));
+    g.setColour(theme::col::borderSoft);
+    g.drawHorizontalLine(0, 0.0f, (float)getWidth());
+    // key/status box
+    auto box = chordLabel.getBounds().toFloat().reduced(0.5f);
+    g.setColour(theme::col::warmSoft);
+    g.fillRoundedRectangle(box, theme::radius);
+    g.setColour(theme::col::warm.withAlpha(0.55f));
+    g.drawRoundedRectangle(box, theme::radius, 1.0f);
+}
 
 void ChordPanel::resized()
 {
-    auto r = getLocalBounds().reduced(4);
-    auto place = [&](juce::Component& c, int w) { c.setBounds(r.removeFromLeft(w)); r.removeFromLeft(4); };
-    place(rootLabel, 36); place(root, 64);
-    place(scaleLabel, 40); place(scale, 140);
-    place(chordMode, 130);
+    using namespace theme;
+    auto r = getLocalBounds().reduced(gap, 6);
+    r.removeFromLeft(30 + gapGroup); // align with the transport row (logo column)
+    auto place = [&](juce::Component& c, int w, int after = gapS) { c.setBounds(r.removeFromLeft(w)); r.removeFromLeft(after); };
+    place(rootLabel, 34); place(root, 64, gapGroup);
+    place(scaleLabel, 38); place(scale, 150, gapGroup);
+    place(chordMode, 132, gapGroup);
     place(modsLabel, 64);
-    for (auto& b : mods) place(b, 92);
-    r.removeFromLeft(8);
-    chordLabel.setBounds(r);
+    for (auto& b : mods) place(b, 96);
+    r.removeFromLeft(gapGroup);
+    const int textW = (int)juce::GlyphArrangement::getStringWidth(chordLabel.getFont(), chordLabel.getText()) + 24;
+    chordLabel.setBounds(r.removeFromLeft(juce::jlimit(120, std::max(120, r.getWidth()), textW)));
 }
 
 void ChordPanel::push()
@@ -79,7 +101,11 @@ void ChordPanel::refreshDisplay()
     juce::String text = juce::String(theory::pitchClassName(app.project.harmony.root)) + " " +
                         theory::ScaleRegistry::instance().byIdOrDefault(app.project.harmony.scaleId).displayName;
     if (d.chordMode) text += "   |   Chord: " + juce::String::fromUTF8(d.currentChord.empty() ? "-" : d.currentChord.c_str());
-    chordLabel.setText(text, juce::dontSendNotification);
+    if (text != chordLabel.getText()) {
+        chordLabel.setText(text, juce::dontSendNotification);
+        resized();
+        repaint();
+    }
 }
 
 } // namespace mc::gui

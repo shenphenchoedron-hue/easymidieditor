@@ -1,6 +1,7 @@
 #include "gui/PianoRollComponent.h"
 #include "sequencer/Timing.h"
 #include "theory/ChordEngine.h"
+#include "gui/Theme.h"
 
 namespace mc::gui {
 
@@ -11,7 +12,7 @@ namespace {
 constexpr int kKeyboardWidth = 64;
 constexpr int kTimelineHeight = 26;
 constexpr int kVelocityHeight = 64;
-constexpr int kScrollbar = 12;
+constexpr int kScrollbar = 10;
 
 bool isBlackKey(int p) { const int pc = p % 12; return pc == 1 || pc == 3 || pc == 6 || pc == 8 || pc == 10; }
 
@@ -20,9 +21,10 @@ theory::Scale currentScale(const AppContext& app)
     return {app.project.harmony.root, theory::ScaleRegistry::instance().byIdOrDefault(app.project.harmony.scaleId)};
 }
 
-const juce::Colour kBg(0xff1e2126), kRowBlack(0xff1a1c20), kRowWhite(0xff24272d), kRowScale(0xff2c3038),
-    kLineGrid(0xff30343b), kLineBeat(0xff3c414a), kLineBar(0xff5a606b), kNote(0xff4fa3e0), kNoteSel(0xffffc04d),
-    kPlayhead(0xffff5555), kLoop(0x2240c0ff), kRec(0xffe05050);
+namespace tc = theme::col;
+const juce::Colour kBg = tc::rollBg, kRowBlack = tc::rollRowBlack, kRowWhite = tc::rollRowWhite, kRowScale = tc::rollRowScale,
+    kLineGrid = tc::gridSub, kLineBeat = tc::gridBeat, kLineBar = tc::gridBar, kNote = tc::note, kNoteSel = tc::noteSel,
+    kPlayhead = tc::playhead, kLoop = tc::loop, kRec = tc::record;
 } // namespace
 
 // ============================================================ Timeline
@@ -32,23 +34,27 @@ public:
     void paint(juce::Graphics& g) override
     {
         auto& p = roll.app.project;
-        g.fillAll(juce::Colour(0xff2a2d33));
+        g.fillAll(tc::timelineBg);
+        g.setColour(tc::gridBeat);
+        g.drawHorizontalLine(getHeight() - 1, 0.0f, (float)getWidth());
         const Tick bar = seq::ticksPerBar(p.timeSig), beat = seq::ticksPerBeat(p.timeSig);
         if (p.loopEnabled || dragLoop) {
             const auto x1 = (float)roll.tickToX((double)p.loopStart), x2 = (float)roll.tickToX((double)p.loopEnd);
-            g.setColour(juce::Colour(p.loopEnabled ? 0x6640c0ff : 0x33888888));
-            g.fillRect(x1, 0.0f, x2 - x1, (float)getHeight() * 0.4f);
+            g.setColour(p.loopEnabled ? tc::accent.withAlpha(0.55f) : juce::Colour(0x33888888));
+            g.fillRoundedRectangle(x1, 2.0f, x2 - x1, 7.0f, 3.0f);
         }
         const Tick first = std::max<Tick>(0, (Tick)roll.xToTick(0) / beat * beat);
         const Tick last = (Tick)roll.xToTick(getWidth()) + beat;
-        g.setFont(12.0f);
+        g.setFont(theme::uiFont(11.5f, true));
         for (Tick t = first; t <= last; t += beat) {
             const float x = (float)roll.tickToX((double)t);
             const bool isBar = t % bar == 0;
-            g.setColour(isBar ? juce::Colours::lightgrey : juce::Colours::grey);
-            g.drawVerticalLine((int)x, isBar ? 0.0f : (float)getHeight() * 0.6f, (float)getHeight());
-            if (isBar && roll.pxPerTick * (double)bar > 28)
-                g.drawText(juce::String(t / bar + 1), (int)x + 3, 2, 40, 14, juce::Justification::left);
+            g.setColour(isBar ? tc::gridBar : tc::gridBeat);
+            g.drawVerticalLine((int)x, isBar ? 4.0f : (float)getHeight() * 0.65f, (float)getHeight());
+            if (isBar && roll.pxPerTick * (double)bar > 28) {
+                g.setColour(juce::Colour(0xffc9d1da));
+                g.drawText(juce::String(t / bar + 1), (int)x + 4, 9, 40, 14, juce::Justification::left);
+            }
         }
         const float px = (float)roll.tickToX(roll.app.engine->position());
         g.setColour(kPlayhead);
@@ -90,25 +96,38 @@ public:
         const auto scale = currentScale(roll.app);
         const auto disp = roll.app.chordDisplay();
         const std::set<int> sounding(disp.soundingNotes.begin(), disp.soundingNotes.end());
-        g.fillAll(juce::Colours::white);
+        g.fillAll(tc::keyWhite);
+        const float w = (float)getWidth(), blackW = w * 0.62f;
         for (int p = 0; p < 128; ++p) {
             const float y = (float)roll.pitchToY(p), h = (float)roll.rowHeight;
             if (y > getHeight() || y + h < 0) continue;
             const bool black = isBlackKey(p);
-            juce::Colour c = black ? juce::Colour(0xff222222) : juce::Colours::white;
-            if (scale.contains(p)) c = c.interpolatedWith(juce::Colour(0xff6fb7ff), black ? 0.25f : 0.18f);
-            if (sounding.count(p) || p == mousePitch) c = juce::Colour(0xffffa030);
-            g.setColour(c);
-            g.fillRect(0.0f, y, (float)getWidth(), h);
-            g.setColour(juce::Colour(0xff888888));
-            g.drawHorizontalLine((int)(y + h), 0.0f, (float)getWidth());
-            if (p % 12 == 0 || (scale.degreeOf(p) == 0 && h >= 10)) {
-                g.setColour(black ? juce::Colours::white : juce::Colours::black);
-                g.setFont(juce::jmin(12.0f, h));
-                g.drawText(theory::midiNoteName(p), 2, (int)y, getWidth() - 4, (int)h, juce::Justification::centredRight);
+            const bool lit = sounding.count(p) || p == mousePitch;
+            // white key strip (full width) with a subtle in-scale tint
+            juce::Colour wc = tc::keyWhite;
+            if (!black && scale.contains(p)) wc = wc.interpolatedWith(tc::accent, 0.08f);
+            if (!black && lit) wc = tc::warm;
+            g.setColour(wc);
+            g.fillRect(0.0f, y, w, h);
+            if (black) {
+                g.setColour(tc::keyWhite);
+                g.fillRect(blackW, y, w - blackW, h);
+                juce::Colour bc = tc::keyBlack;
+                if (scale.contains(p)) bc = bc.interpolatedWith(tc::accent, 0.22f);
+                if (lit) bc = tc::warm.darker(0.15f);
+                g.setColour(bc);
+                g.fillRoundedRectangle(0.0f, y + 0.5f, blackW, h - 1.0f, 2.0f);
+            }
+            const bool isC = p % 12 == 0;
+            g.setColour(isC ? juce::Colour(0xff9aa5b1) : tc::keyLine);
+            g.drawHorizontalLine((int)(y + h), black ? blackW : 0.0f, w);
+            if (isC || (scale.degreeOf(p) == 0 && h >= 10)) {
+                g.setColour(isC ? tc::text : tc::textDim);
+                g.setFont(theme::uiFont(juce::jmin(11.5f, h), isC));
+                g.drawText(theory::midiNoteName(p), 2, (int)y, getWidth() - 6, (int)h, juce::Justification::centredRight);
             }
         }
-        g.setColour(juce::Colours::black);
+        g.setColour(tc::border);
         g.drawVerticalLine(getWidth() - 1, 0.0f, (float)getHeight());
     }
     void mouseDown(const juce::MouseEvent& e) override { press(roll.yToPitch(e.y)); }
@@ -147,7 +166,7 @@ public:
             if (y > getHeight() || y + h < 0) continue;
             g.setColour(scale.contains(pitch) ? kRowScale : (isBlackKey(pitch) ? kRowBlack : kRowWhite));
             g.fillRect(0.0f, y, (float)getWidth(), h);
-            g.setColour(pitch % 12 == 0 ? kLineBeat : kLineGrid.withAlpha(0.5f));
+            g.setColour(pitch % 12 == 0 ? tc::rollRowC : kRowBlack.darker(0.25f));
             g.drawHorizontalLine((int)(y + h), 0.0f, (float)getWidth());
         }
 
@@ -156,7 +175,8 @@ public:
         while (step * roll.pxPerTick < 6) step *= 2;
         const Tick first = std::max<Tick>(0, (Tick)roll.xToTick(0) / step * step);
         for (Tick t = first; roll.tickToX((double)t) < getWidth(); t += step) {
-            g.setColour(t % bar == 0 ? kLineBar : t % beat == 0 ? kLineBeat : kLineGrid);
+            const bool isBar = t % bar == 0, isBeat = t % beat == 0;
+            g.setColour(isBar ? kLineBar.withAlpha(0.75f) : isBeat ? kLineBeat : kLineGrid);
             g.drawVerticalLine((int)roll.tickToX((double)t), 0.0f, (float)getHeight());
         }
 
@@ -169,8 +189,8 @@ public:
         // other tracks as faint ghost notes
         for (auto& t : p.tracks())
             if (auto* mt = dynamic_cast<model::MidiTrack*>(t.get()); mt && mt->id() != p.activeTrack) {
-                g.setColour(juce::Colours::white.withAlpha(0.07f));
-                for (auto& n : mt->notes()) g.fillRect(noteRect(n));
+                g.setColour(juce::Colour(0xffaeb9c5).withAlpha(0.09f));
+                for (auto& n : mt->notes()) g.fillRoundedRectangle(noteRect(n).reduced(0.5f, 1.0f), 3.0f);
             }
 
         if (auto* track = app.activeMidiTrack()) {
@@ -178,13 +198,14 @@ public:
                 auto r = noteRect(n);
                 if (!r.intersects(getLocalBounds().toFloat())) continue;
                 const bool sel = roll.selection.count(n.id) > 0;
-                auto c = (sel ? kNoteSel : kNote).interpolatedWith(juce::Colours::black, 0.45f * (1.0f - (float)n.velocity / 127.0f));
+                auto c = (sel ? kNoteSel : kNote).interpolatedWith(kBg, 0.45f * (1.0f - (float)n.velocity / 127.0f));
+                const auto nr = r.reduced(0.5f, 1.0f);
                 g.setColour(c);
-                g.fillRoundedRectangle(r.reduced(0.5f), 2.0f);
-                g.setColour(sel ? juce::Colours::white : c.darker(0.6f));
-                g.drawRoundedRectangle(r.reduced(0.5f), 2.0f, 1.0f);
+                g.fillRoundedRectangle(nr, 3.0f);
+                g.setColour(sel ? juce::Colour(0xfffff1d6) : c.darker(0.45f));
+                g.drawRoundedRectangle(nr, 3.0f, 1.0f);
                 if (r.getHeight() >= 11 && r.getWidth() > 26) {
-                    g.setColour(juce::Colours::black.withAlpha(0.7f));
+                    g.setColour(juce::Colour(0xff10161c).withAlpha(0.75f));
                     g.setFont(juce::jmin(11.0f, r.getHeight() - 1));
                     g.drawText(theory::midiNoteName(n.pitch), r.reduced(3, 0), juce::Justification::centredLeft, false);
                 }
@@ -208,7 +229,7 @@ public:
         g.drawLine(px, 0, px, (float)getHeight(), 1.5f);
 
         if (!app.activeMidiTrack()) {
-            g.setColour(juce::Colours::grey);
+            g.setColour(tc::textDim);
             g.drawText("No MIDI track selected", getLocalBounds(), juce::Justification::centred);
         }
     }
@@ -392,8 +413,8 @@ public:
     explicit VelocityLane(PianoRollComponent& r) : roll(r) {}
     void paint(juce::Graphics& g) override
     {
-        g.fillAll(juce::Colour(0xff191b1f));
-        g.setColour(kLineGrid);
+        g.fillAll(tc::velLaneBg);
+        g.setColour(tc::gridBeat);
         g.drawHorizontalLine(0, 0, (float)getWidth());
         auto* t = roll.app.activeMidiTrack();
         if (!t) return;
@@ -401,9 +422,9 @@ public:
             const float x = (float)roll.tickToX((double)n.start);
             if (x < -4 || x > getWidth()) continue;
             const float h = (float)(getHeight() - 4) * (float)n.velocity / 127.0f;
-            g.setColour(roll.selection.count(n.id) ? kNoteSel : kNote);
-            g.fillRect(x, (float)getHeight() - h, 3.0f, h);
-            g.fillEllipse(x - 2, (float)getHeight() - h - 3, 7, 7);
+            g.setColour((roll.selection.count(n.id) ? kNoteSel : kNote).withAlpha(0.85f));
+            g.fillRect(x + 1.0f, (float)getHeight() - h, 2.0f, h);
+            g.fillEllipse(x - 1.5f, (float)getHeight() - h - 3, 7, 7);
         }
     }
     void mouseDown(const juce::MouseEvent& e) override
@@ -461,6 +482,10 @@ PianoRollComponent::PianoRollComponent(AppContext& a) : app(a)
     vbar.addListener(this);
     hbar.setAutoHide(false);
     vbar.setAutoHide(false);
+    for (auto* b : {&hbar, &vbar}) {
+        b->setColour(juce::ScrollBar::backgroundColourId, tc::timelineBg);
+        b->setColour(juce::ScrollBar::trackColourId, tc::timelineBg);
+    }
     app.addChangeListener(this);
     setWantsKeyboardFocus(true);
 }
@@ -469,9 +494,9 @@ PianoRollComponent::~PianoRollComponent() { app.removeChangeListener(this); }
 
 void PianoRollComponent::paint(juce::Graphics& g)
 {
-    g.fillAll(juce::Colour(0xff2a2d33));
-    g.setColour(juce::Colours::grey);
-    g.setFont(10.0f);
+    g.fillAll(tc::timelineBg);
+    g.setColour(juce::Colour(0xff8f9aa6));
+    g.setFont(theme::uiFont(11.0f));
     g.drawText("Vel", 0, getHeight() - kScrollbar - kVelocityHeight, kKeyboardWidth, 16, juce::Justification::centred);
 }
 

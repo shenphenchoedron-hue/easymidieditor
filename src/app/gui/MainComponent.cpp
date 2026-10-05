@@ -1,6 +1,7 @@
 #include "gui/MainComponent.h"
 #include "gui/PluginBrowser.h"
 #include "gui/SettingsComponent.h"
+#include "gui/Theme.h"
 
 namespace mc::gui {
 
@@ -16,7 +17,6 @@ const char* kProjectExt = "*.mcproj";
 MainComponent::MainComponent(AppContext& a)
     : app(a), transport(a), chordPanel(a), trackList(a), pianoRoll(a)
 {
-    juce::LookAndFeel::getDefaultLookAndFeel().setColour(juce::ResizableWindow::backgroundColourId, juce::Colour(0xff23262b));
     for (juce::Component* c : std::initializer_list<juce::Component*>{&transport, &chordPanel, &trackList, &pianoRoll}) addAndMakeVisible(c);
 #if !JUCE_MAC
     addAndMakeVisible(menuBar);
@@ -50,10 +50,17 @@ void MainComponent::resized()
 #if !JUCE_MAC
     menuBar.setBounds(r.removeFromTop(24));
 #endif
-    transport.setBounds(r.removeFromTop(38));
-    chordPanel.setBounds(r.removeFromTop(38));
+    transport.setBounds(r.removeFromTop(44));
+    chordPanel.setBounds(r.removeFromTop(40));
+    r.removeFromTop(1);
     trackList.setBounds(r.removeFromLeft(290));
+    r.removeFromLeft(1);
     pianoRoll.setBounds(r);
+}
+
+void MainComponent::paint(juce::Graphics& g)
+{
+    g.fillAll(theme::col::border); // 1px seams between sections
 }
 
 void MainComponent::timerCallback()

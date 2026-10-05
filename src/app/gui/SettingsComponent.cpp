@@ -1,12 +1,13 @@
 #include "gui/SettingsComponent.h"
 #include "theory/Scale.h"
+#include "gui/Theme.h"
 
 namespace mc::gui {
 
 namespace {
 class SettingsWindow final : public juce::DocumentWindow {
 public:
-    explicit SettingsWindow(AppContext& app) : DocumentWindow("Settings", juce::Colours::darkgrey, closeButton)
+    explicit SettingsWindow(AppContext& app) : DocumentWindow("Settings", theme::col::appBg, closeButton)
     {
         setUsingNativeTitleBar(true);
         setContentOwned(new SettingsComponent(app), true);
@@ -34,7 +35,7 @@ SettingsComponent::SettingsComponent(AppContext& a)
 {
     addAndMakeVisible(audioSelector);
     for (juce::Component* c : std::initializer_list<juce::Component*>{&midiLabel, &midiInput, &refreshBtn, &mapLabel, &resetBtn}) addAndMakeVisible(c);
-    mapLabel.setFont(juce::FontOptions(15.0f, juce::Font::bold));
+    mapLabel.setFont(theme::uiFont(14.0f, true));
     refreshBtn.onClick = [this] { refreshMidiInputs(); };
     midiInput.onChange = [this] {
         const int i = midiInput.getSelectedItemIndex();
@@ -73,7 +74,7 @@ SettingsComponent::~SettingsComponent()
     if (auto xml = app.deviceManager.createStateXml()) app.settings.setAudioDeviceState(xml.get());
 }
 
-void SettingsComponent::paint(juce::Graphics& g) { g.fillAll(juce::Colour(0xff2b2e34)); }
+void SettingsComponent::paint(juce::Graphics& g) { g.fillAll(theme::col::panel); }
 
 void SettingsComponent::resized()
 {
@@ -125,7 +126,8 @@ void SettingsComponent::refreshMapping()
         const auto learning = app.learningModifier();
         const bool isLearning = learning && (int)*learning == i;
         r.learn.setButtonText(isLearning ? "Press a key..." : "MIDI Learn");
-        r.learn.setColour(juce::TextButton::buttonColourId, isLearning ? juce::Colour(0xffc07020) : juce::Colour(0xff3a3f47));
+        r.learn.setToggleState(isLearning, juce::dontSendNotification);
+        r.learn.setColour(juce::TextButton::buttonOnColourId, theme::col::warm);
     }
 }
 

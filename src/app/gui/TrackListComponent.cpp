@@ -1,9 +1,10 @@
 #include "gui/TrackListComponent.h"
 #include "gui/PluginBrowser.h"
+#include "gui/Theme.h"
 
 namespace mc::gui {
 
-namespace { constexpr int kRowHeight = 74; }
+namespace { constexpr int kRowHeight = 80; }
 
 class TrackListComponent::Row final : public juce::Component {
 public:
@@ -12,14 +13,16 @@ public:
         for (juce::Component* c : std::initializer_list<juce::Component*>{&name, &mute, &solo, &volume, &pan, &channel, &pluginBtn, &editBtn})
             addAndMakeVisible(c);
         name.setEditable(false, true);
-        name.setFont(juce::FontOptions(14.0f, juce::Font::bold));
+        name.setFont(theme::uiFont(14.0f, true));
+        name.setColour(juce::Label::textColourId, theme::col::text);
         name.onTextChange = [this] { change([&](model::TrackProperties& p) { p.name = name.getText().toStdString(); }); };
         name.addMouseListener(this, false);
 
         mute.setClickingTogglesState(true);
         solo.setClickingTogglesState(true);
-        mute.setColour(juce::TextButton::buttonOnColourId, juce::Colours::orange.darker());
-        solo.setColour(juce::TextButton::buttonOnColourId, juce::Colours::yellow.darker());
+        theme::setStyle(mute, theme::styleWarm);
+        mute.setTooltip("Mute");
+        solo.setTooltip("Solo");
         mute.onClick = [this] { change([&](auto& p) { p.mute = mute.getToggleState(); }); };
         solo.onClick = [this] { change([&](auto& p) { p.solo = solo.getToggleState(); }); };
 
@@ -70,7 +73,7 @@ public:
         else if (t->plugin.bypassed) label += " [bypass]";
         pluginBtn.setButtonText(label);
         pluginBtn.setTooltip(missing ? app.pluginError(id) : juce::String(t->plugin.format + " - " + t->plugin.manufacturer));
-        pluginBtn.setColour(juce::TextButton::buttonColourId, missing ? juce::Colour(0xff902020) : juce::Colour(0xff3a3f47));
+        theme::setStyle(pluginBtn, missing ? theme::styleDanger : theme::styleSelector);
         auto* inst = app.engine->instrument(id);
         editBtn.setEnabled(inst && inst->hasEditor());
         active = app.project.activeTrack == id;
@@ -79,30 +82,33 @@ public:
 
     void paint(juce::Graphics& g) override
     {
-        g.fillAll(active ? juce::Colour(0xff3b4554) : juce::Colour(0xff2b2e34));
-        if (active) { g.setColour(juce::Colour(0xff4fa3e0)); g.fillRect(0, 0, 4, getHeight()); }
-        g.setColour(juce::Colours::black);
+        g.fillAll(active ? theme::col::accentSoft : theme::col::panel);
+        if (active) { g.setColour(theme::col::accent); g.fillRect(0, 0, 3, getHeight()); }
+        g.setColour(theme::col::borderSoft);
         g.drawHorizontalLine(getHeight() - 1, 0, (float)getWidth());
     }
 
     void resized() override
     {
-        auto r = getLocalBounds().reduced(6, 4).withTrimmedLeft(4);
+        using namespace theme;
+        auto r = getLocalBounds().reduced(gap, 5).withTrimmedLeft(4);
         auto l1 = r.removeFromTop(22);
-        solo.setBounds(l1.removeFromRight(24));
-        l1.removeFromRight(2);
-        mute.setBounds(l1.removeFromRight(24));
-        l1.removeFromRight(4);
-        channel.setBounds(l1.removeFromRight(70));
+        solo.setBounds(l1.removeFromRight(26));
+        l1.removeFromRight(gapS);
+        mute.setBounds(l1.removeFromRight(26));
+        l1.removeFromRight(gap);
+        channel.setBounds(l1.removeFromRight(72));
+        l1.removeFromRight(gapS);
         name.setBounds(l1);
-        r.removeFromTop(2);
-        auto l2 = r.removeFromTop(20);
-        pan.setBounds(l2.removeFromRight(70));
+        r.removeFromTop(gapS);
+        auto l2 = r.removeFromTop(16);
+        pan.setBounds(l2.removeFromRight(72));
+        l2.removeFromRight(gap);
         volume.setBounds(l2);
-        r.removeFromTop(2);
+        r.removeFromTop(gapS);
         auto l3 = r.removeFromTop(22);
         editBtn.setBounds(l3.removeFromRight(30));
-        l3.removeFromRight(2);
+        l3.removeFromRight(gapS);
         pluginBtn.setBounds(l3);
     }
 
@@ -188,14 +194,23 @@ TrackListComponent::TrackListComponent(AppContext& a) : app(a)
 
 TrackListComponent::~TrackListComponent() { app.removeChangeListener(this); }
 
-void TrackListComponent::paint(juce::Graphics& g) { g.fillAll(juce::Colour(0xff23262b)); }
+void TrackListComponent::paint(juce::Graphics& g)
+{
+    g.fillAll(theme::col::panel);
+    g.setColour(theme::col::borderSoft);
+    g.drawHorizontalLine(33, 0.0f, (float)getWidth());
+    g.setColour(theme::col::textDim);
+    g.setFont(theme::uiFont(11.0f, true));
+    g.drawText("TRACKS", theme::gap + 4, 0, 60, 34, juce::Justification::centredLeft);
+}
 
 void TrackListComponent::resized()
 {
     auto r = getLocalBounds();
-    auto top = r.removeFromTop(30).reduced(4);
-    addBtn.setBounds(top.removeFromLeft(top.getWidth() / 2).reduced(2, 0));
-    delBtn.setBounds(top.reduced(2, 0));
+    auto top = r.removeFromTop(34).reduced(theme::gap, 6);
+    delBtn.setBounds(top.removeFromRight(72));
+    top.removeFromRight(theme::gapS);
+    addBtn.setBounds(top.removeFromRight(72));
     viewport.setBounds(r);
     content.setSize(viewport.getMaximumVisibleWidth(), (int)rows.size() * kRowHeight);
     for (size_t i = 0; i < rows.size(); ++i) rows[i]->setBounds(0, (int)i * kRowHeight, content.getWidth(), kRowHeight);
