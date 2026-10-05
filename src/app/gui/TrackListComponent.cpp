@@ -1,10 +1,147 @@
 #include "gui/TrackListComponent.h"
 #include "gui/PluginBrowser.h"
 #include "gui/Theme.h"
+#include <algorithm>
 
 namespace mc::gui {
 
-namespace { constexpr int kRowHeight = 80; }
+namespace {
+constexpr int kRowHeight = 80;
+
+// Track colour picker shown in a call-out: colour field + sliders, preset
+// palette and user swatches (saved in the user settings, not the project).
+// The colour is previewed live; closing the picker records one undo step.
+class TrackColourPicker final : public juce::Component, private juce::ChangeListener {
+public:
+    TrackColourPicker(AppContext& a, model::TrackId i) : app(a), id(i)
+    {
+        if (auto* t = app.project.track(id)) before = model::TrackProperties::from(*t);
+        swatches = app.settings.colourSwatches();
+
+        selector.setCurrentColour(before.colour ? juce::Colour(before.colour) : theme::trackPalette[0].second, juce::dontSendNotification);
+        selector.addChangeListener(this);
+        addAndMakeVisible(selector);
+
+        saveBtn.setTooltip("Save the current colour as a swatch");
+        saveBtn.onClick = [this] {
+            const auto c = selector.getCurrentColour().withAlpha(1.0f).getARGB();
+            swatches.erase(std::remove(swatches.begin(), swatches.end(), c), swatches.end());
+            swatches.insert(swatches.begin(), c);
+            if (swatches.size() > kMaxSwatches) swatches.resize(kMaxSwatches);
+            app.settings.setColourSwatches(swatches);
+            layout();
+        };
+        defaultBtn.setTooltip("Use the default theme colour");
+        defaultBtn.onClick = [this] { apply(0); };
+        addAndMakeVisible(saveBtn);
+        addAndMakeVisible(defaultBtn);
+        layout();
+    }
+
+    ~TrackColourPicker() override
+    {
+        selector.removeChangeListener(this);
+        // Turn the live preview into a single undoable change.
+        auto* t = app.project.track(id);
+        if (!t) return;
+        auto after = model::TrackProperties::from(*t);
+        if (after.colour == before.colour) return;
+        before.applyTo(*t);
+        app.undo.perform(std::make_unique<model::SetTrackPropertiesCommand>(id, before, after));
+    }
+
+    void paint(juce::Graphics& g) override
+    {
+        g.setFont(theme::uiFont(12.0f));
+        g.setColour(theme::col::textDim);
+        g.drawText("Presets", presetLabel, juce::Justification::centredLeft);
+        g.drawText(swatches.empty() ? "Saved (none yet - click \"Save swatch\")" : "Saved (right-click to remove)", savedLabel, juce::Justification::centredLeft);
+        const auto current = app.project.track(id) ? app.project.track(id)->colour : 0u;
+        auto drawSwatch = [&](juce::Rectangle<int> r, juce::Colour c) {
+            const auto f = r.toFloat().reduced(1.5f);
+            g.setColour(c);
+            g.fillRoundedRectangle(f, 3.0f);
+            const bool sel = c.getARGB() == current;
+            g.setColour(sel ? juce::Colours::white : c.darker(0.4f));
+            g.drawRoundedRectangle(f, 3.0f, sel ? 2.0f : 1.0f);
+        };
+        for (size_t i = 0; i < theme::trackPalette.size(); ++i) drawSwatch(presetCell((int)i), theme::trackPalette[i].second);
+        for (size_t i = 0; i < swatches.size(); ++i) drawSwatch(savedCell((int)i), juce::Colour(swatches[i]));
+    }
+
+    void mouseUp(const juce::MouseEvent& e) override
+    {
+        for (int i = 0; i < (int)theme::trackPalette.size(); ++i)
+            if (presetCell(i).contains(e.getPosition())) { pick(theme::trackPalette[(size_t)i].second); return; }
+        for (int i = 0; i < (int)swatches.size(); ++i)
+            if (savedCell(i).contains(e.getPosition())) {
+                if (e.mods.isPopupMenu()) {
+                    swatches.erase(swatches.begin() + i);
+                    app.settings.setColourSwatches(swatches);
+                    layout();
+                } else {
+                    pick(juce::Colour(swatches[(size_t)i]));
+                }
+                return;
+            }
+    }
+
+    void resized() override {}
+
+private:
+    static constexpr int kCell = 22, kCols = 10, kPad = 8;
+    static constexpr size_t kMaxSwatches = 30;
+
+    void layout()
+    {
+        const int w = kCols * kCell + 2 * kPad;
+        int y = kPad;
+        selector.setBounds(kPad, y, w - 2 * kPad, 210);
+        y += 214;
+        presetLabel = {kPad, y, w - 2 * kPad, 16};
+        y += 18;
+        presetTop = y;
+        y += kCell * (((int)theme::trackPalette.size() + kCols - 1) / kCols) + 6;
+        savedLabel = {kPad, y, w - 2 * kPad, 16};
+        y += 18;
+        savedTop = y;
+        y += kCell * std::max(1, ((int)swatches.size() + kCols - 1) / kCols) + 8;
+        const int bw = (w - 2 * kPad - theme::gapS) / 2;
+        saveBtn.setBounds(kPad, y, bw, 24);
+        defaultBtn.setBounds(kPad + bw + theme::gapS, y, bw, 24);
+        y += 24 + kPad;
+        setSize(w, y);
+        repaint();
+    }
+    juce::Rectangle<int> presetCell(int i) const { return {kPad + (i % kCols) * kCell, presetTop + (i / kCols) * kCell, kCell, kCell}; }
+    juce::Rectangle<int> savedCell(int i) const { return {kPad + (i % kCols) * kCell, savedTop + (i / kCols) * kCell, kCell, kCell}; }
+
+    void pick(juce::Colour c)
+    {
+        selector.setCurrentColour(c, juce::dontSendNotification);
+        apply(c.withAlpha(1.0f).getARGB());
+    }
+    void apply(std::uint32_t argb)
+    {
+        if (auto* t = app.project.track(id); t && t->colour != argb) {
+            t->colour = argb;
+            app.project.notifyChanged();
+        }
+        repaint();
+    }
+    void changeListenerCallback(juce::ChangeBroadcaster*) override { apply(selector.getCurrentColour().withAlpha(1.0f).getARGB()); }
+
+    AppContext& app;
+    model::TrackId id;
+    model::TrackProperties before;
+    std::vector<std::uint32_t> swatches;
+    juce::ColourSelector selector{juce::ColourSelector::showColourAtTop | juce::ColourSelector::showSliders |
+                                  juce::ColourSelector::showColourspace | juce::ColourSelector::editableColour};
+    juce::TextButton saveBtn{"Save swatch"}, defaultBtn{"Default"};
+    juce::Rectangle<int> presetLabel, savedLabel;
+    int presetTop = 0, savedTop = 0;
+};
+} // namespace
 
 class TrackListComponent::Row final : public juce::Component {
 public:
@@ -88,13 +225,15 @@ public:
     void paint(juce::Graphics& g) override
     {
         if (colour) {
+            // Active track: strong colour. Inactive: muted (desaturated, light tint).
             const juce::Colour tc(colour);
-            g.fillAll(theme::col::panel.interpolatedWith(tc, active ? 0.30f : 0.15f));
-            g.setColour(tc);
-            g.fillRect(0, 0, active ? 5 : 3, getHeight());
+            const auto muted = tc.withMultipliedSaturation(0.45f);
+            g.fillAll(theme::col::panel.interpolatedWith(active ? tc : muted, active ? 0.50f : 0.10f));
+            g.setColour(active ? tc : muted.withAlpha(0.7f));
+            g.fillRect(0, 0, active ? 6 : 3, getHeight());
             if (active) {
-                g.setColour(tc.withAlpha(0.8f));
-                g.drawRect(getLocalBounds().withTrimmedLeft(5).withTrimmedBottom(1), 1);
+                g.setColour(tc);
+                g.drawRect(getLocalBounds().withTrimmedLeft(6).withTrimmedBottom(1), 2);
             }
         } else {
             g.fillAll(active ? theme::col::accentSoft : theme::col::panel);
@@ -145,35 +284,8 @@ private:
     void showColourMenu()
     {
         app.selectTrack(id);
-        juce::PopupMenu m;
-        auto swatch = [](juce::Colour c) {
-            juce::Image img(juce::Image::ARGB, 14, 14, true);
-            juce::Graphics g(img);
-            g.setColour(c);
-            g.fillRoundedRectangle(1, 1, 12, 12, 3);
-            auto d = std::make_unique<juce::DrawableImage>();
-            d->setImage(img);
-            return d;
-        };
-        juce::PopupMenu::Item def("Default");
-        def.itemID = 1;
-        def.isTicked = colour == 0;
-        m.addItem(std::move(def));
-        m.addSeparator();
-        for (size_t i = 0; i < theme::trackPalette.size(); ++i) {
-            const auto& [label, c] = theme::trackPalette[i];
-            juce::PopupMenu::Item it(label);
-            it.itemID = (int)i + 10;
-            it.isTicked = colour == c.getARGB();
-            it.image = swatch(c);
-            m.addItem(std::move(it));
-        }
-        juce::Component::SafePointer<Row> self(this);
-        m.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(&colourBtn), [self](int r) {
-            if (!self || r == 0) return;
-            const std::uint32_t argb = r == 1 ? 0u : theme::trackPalette[(size_t)(r - 10)].second.getARGB();
-            self->change([argb](model::TrackProperties& p) { p.colour = argb; });
-        });
+        auto picker = std::make_unique<TrackColourPicker>(app, id);
+        juce::CallOutBox::launchAsynchronously(std::move(picker), colourBtn.getScreenBounds(), nullptr);
     }
 
     void showPluginMenu()

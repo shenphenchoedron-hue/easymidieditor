@@ -48,4 +48,19 @@ juce::File Settings::lastDirectory() const
 
 void Settings::setLastDirectory(const juce::File& f) { file().setValue("lastDir", f.getFullPathName()); }
 
+std::vector<std::uint32_t> Settings::colourSwatches() const
+{
+    std::vector<std::uint32_t> out;
+    for (auto& s : juce::StringArray::fromTokens(file().getValue("colourSwatches"), ",", ""))
+        if (s.trim().isNotEmpty()) out.push_back((std::uint32_t)s.trim().getHexValue64());
+    return out;
+}
+
+void Settings::setColourSwatches(const std::vector<std::uint32_t>& v)
+{
+    juce::StringArray a;
+    for (auto c : v) a.add(juce::String::toHexString((juce::int64)c));
+    file().setValue("colourSwatches", a.joinIntoString(","));
+}
+
 } // namespace mc::settings

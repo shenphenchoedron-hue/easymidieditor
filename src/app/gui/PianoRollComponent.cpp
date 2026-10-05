@@ -197,7 +197,7 @@ public:
         const auto bounds = getLocalBounds().toFloat();
         for (auto& t : p.tracks())
             if (auto* mt = dynamic_cast<model::MidiTrack*>(t.get()); mt && mt->id() != p.activeTrack) {
-                const auto ghost = trackNoteColour(*mt);
+                const auto ghost = trackNoteColour(*mt).withMultipliedSaturation(0.6f); // muted: not the active track
                 for (auto& n : mt->notes()) {
                     const auto r = noteRect(n).reduced(0.5f, 1.0f);
                     if (!r.intersects(bounds)) continue;
@@ -214,7 +214,8 @@ public:
                 auto r = noteRect(n);
                 if (!r.intersects(bounds)) continue;
                 const bool sel = roll.selection.count(n.id) > 0;
-                auto c = (sel ? kNoteSel : base).interpolatedWith(kBg, 0.45f * (1.0f - (float)n.velocity / 127.0f));
+                // Active track in full colour; soft notes only slightly darker.
+                auto c = (sel ? kNoteSel : base).interpolatedWith(kBg, 0.20f * (1.0f - (float)n.velocity / 127.0f));
                 const auto nr = r.reduced(0.5f, 1.0f);
                 g.setColour(c);
                 g.fillRoundedRectangle(nr, 3.0f);

@@ -2,6 +2,8 @@
 // Per-user settings (not per project): devices, controller mappings, paths.
 #include "input/ControllerMapping.h"
 #include <juce_data_structures/juce_data_structures.h>
+#include <cstdint>
+#include <vector>
 
 namespace mc::settings {
 
@@ -18,6 +20,10 @@ public:
 
     std::unique_ptr<juce::XmlElement> audioDeviceState() const;
     void setAudioDeviceState(const juce::XmlElement*);
+
+    // User-saved colour swatches for the track colour picker (ARGB), newest first.
+    std::vector<std::uint32_t> colourSwatches() const;
+    void setColourSwatches(const std::vector<std::uint32_t>&);
 
     juce::File lastDirectory() const;
     void setLastDirectory(const juce::File&);
