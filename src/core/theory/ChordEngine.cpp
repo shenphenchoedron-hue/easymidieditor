@@ -24,14 +24,16 @@ ChordResult ChordEngine::build(const Scale& scale, const ChordRequest& req)
 
     r.symbol = symbolFor(req.playedNote, notes);
 
-    // Inversion: move the lowest note up an octave, repeatedly.
+    // Inversion: the played note stays exactly where it was entered; each step
+    // moves the current top note down an octave (or more) below the lowest note.
+    // C3 E3 G3 -> 1st: G2 C3 E3 -> 2nd: E2 G2 C3.
     const int inv = std::clamp(req.inversion, 0, voices - 1);
     for (int i = 0; i < inv; ++i) {
         std::sort(notes.begin(), notes.end());
-        int low = notes.front();
-        const int high = notes.back();
-        while (low <= high) low += 12;
-        notes.front() = low;
+        const int low = notes.front();
+        int high = notes.back();
+        while (high >= low) high -= 12;
+        notes.back() = high;
     }
     std::sort(notes.begin(), notes.end());
     notes.erase(std::remove_if(notes.begin(), notes.end(), [](int n) { return n < 0 || n > 127; }), notes.end());

@@ -36,6 +36,7 @@ public:
     bool saveProject(const juce::File&, juce::String& error);
     bool importMidi(const juce::File&, juce::String& error);
     bool exportMidi(const juce::File&, juce::String& error);
+    bool exportMusicXml(const juce::File&, juce::String& error);
     juce::File currentFile;
     bool hasUnsavedChanges() const { return dirty; }
 

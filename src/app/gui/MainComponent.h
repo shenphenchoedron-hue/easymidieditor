@@ -30,6 +30,7 @@ private:
     void save(std::function<void()> after = {});
     void importDialog();
     void exportDialog();
+    void exportMusicXmlDialog();
     void confirmDiscard(std::function<void()> proceed);
     void showError(const juce::String&);
 

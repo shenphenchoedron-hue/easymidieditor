@@ -6,7 +6,11 @@ namespace {
 
 class JuceInstrument final : public InstrumentPlugin {
 public:
-    JuceInstrument(std::unique_ptr<juce::AudioPluginInstance> i, std::string fmt) : inst(std::move(i)), fmt_(std::move(fmt)) {}
+    // hasEditor() is queried once and cached: for VST3, JUCE answers it by creating
+    // (and destroying) the plugin's whole editor view. For Native Instruments
+    // plugins that means building a Qt GUI, which made every UI refresh crawl.
+    JuceInstrument(std::unique_ptr<juce::AudioPluginInstance> i, std::string fmt)
+        : inst(std::move(i)), fmt_(std::move(fmt)), hasEditor_(inst->hasEditor()) {}
     ~JuceInstrument() override { inst->releaseResources(); }
 
     std::string name() const override { return inst->getName().toStdString(); }
@@ -20,10 +24,10 @@ public:
         scratch.setSize(std::max({2, inst->getTotalNumInputChannels(), inst->getTotalNumOutputChannels()}), bs);
     }
     void release() override { inst->releaseResources(); }
-    bool hasEditor() const override { return inst->hasEditor(); }
+    bool hasEditor() const override { return hasEditor_; }
     juce::Component* createEditor() override
     {
-        if (inst->hasEditor()) if (auto* e = inst->createEditorIfNeeded()) return e;
+        if (hasEditor_) if (auto* e = inst->createEditorIfNeeded()) return e;
         return new juce::GenericAudioProcessorEditor(*inst);
     }
     juce::MemoryBlock getState() override { juce::MemoryBlock m; inst->getStateInformation(m); return m; }
@@ -44,6 +48,7 @@ public:
 private:
     std::unique_ptr<juce::AudioPluginInstance> inst;
     std::string fmt_;
+    bool hasEditor_ = false;
     juce::AudioBuffer<float> scratch;
     int maxBlock = 0;
 };

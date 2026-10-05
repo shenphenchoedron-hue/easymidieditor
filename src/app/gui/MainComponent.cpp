@@ -7,7 +7,7 @@ namespace mc::gui {
 
 namespace {
 enum MenuId {
-    New = 1, Open, Save, SaveAs, ImportMidi, ExportMidi, Quit,
+    New = 1, Open, Save, SaveAs, ImportMidi, ExportMidi, ExportMusicXml, Quit,
     Undo = 100, Redo, Cut, Copy, Paste, Delete, SelectAll, AddTrack, DeleteTrack,
     Settings = 200, Plugins, Rescan
 };
@@ -109,6 +109,7 @@ juce::PopupMenu MainComponent::getMenuForIndex(int idx, const juce::String&)
         m.addSeparator();
         m.addItem(ImportMidi, "Import MIDI file...");
         m.addItem(ExportMidi, "Export MIDI file...");
+        m.addItem(ExportMusicXml, "Export MusicXML (MuseScore)...");
         m.addSeparator();
         m.addItem(Quit, "Quit");
     } else if (idx == 1) {
@@ -140,6 +141,7 @@ void MainComponent::menuItemSelected(int id, int)
         case SaveAs: saveDialog(); break;
         case ImportMidi: importDialog(); break;
         case ExportMidi: exportDialog(); break;
+        case ExportMusicXml: exportMusicXmlDialog(); break;
         case Quit: juce::JUCEApplication::getInstance()->systemRequestedQuit(); break;
         case Undo: app.undo.undo(); break;
         case Redo: app.undo.redo(); break;
@@ -239,6 +241,20 @@ void MainComponent::exportDialog()
         if (!f.hasFileExtension("mid")) f = f.withFileExtension("mid");
         juce::String err;
         if (!app.exportMidi(f, err)) showError("Export failed:\n" + err);
+    });
+}
+
+void MainComponent::exportMusicXmlDialog()
+{
+    const auto name = (app.currentFile.existsAsFile() ? app.currentFile.getFileNameWithoutExtension() : juce::String("export")) + ".musicxml";
+    chooser = std::make_unique<juce::FileChooser>("Export MusicXML", app.settings.lastDirectory().getChildFile(name), "*.musicxml");
+    chooser->launchAsync(juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::warnAboutOverwriting, [this](const juce::FileChooser& fc) {
+        auto f = fc.getResult();
+        if (f == juce::File()) return;
+        if (!f.hasFileExtension("musicxml")) f = f.withFileExtension("musicxml");
+        app.settings.setLastDirectory(f.getParentDirectory());
+        juce::String err;
+        if (!app.exportMusicXml(f, err)) showError("Export failed:\n" + err);
     });
 }
 

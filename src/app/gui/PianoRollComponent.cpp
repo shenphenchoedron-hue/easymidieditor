@@ -587,7 +587,12 @@ void PianoRollComponent::changeListenerCallback(juce::ChangeBroadcaster*)
 void PianoRollComponent::refreshPlayhead()
 {
     const double pos = app.engine->position();
-    if (app.engine->isPlaying()) { // follow playback
+    // Follow during playback, and also when the playhead is moved while stopped
+    // (Return to start, second Stop, loop start). A jump that lands inside the
+    // visible area, like clicking in the timeline, does not scroll.
+    const bool jumped = pos != lastPlayheadPos;
+    lastPlayheadPos = pos;
+    if (app.engine->isPlaying() || jumped) {
         const double visT = grid->getWidth() / pxPerTick;
         if (pos > scrollX + visT * 0.95 || pos < scrollX) { scrollX = std::max(0.0, pos - visT * 0.05); updateScrollbars(); grid->repaint(); timeline->repaint(); velocity->repaint(); }
     }

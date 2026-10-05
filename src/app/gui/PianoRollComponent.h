@@ -53,6 +53,7 @@ private:
     std::unique_ptr<VelocityLane> velocity;
     juce::ScrollBar hbar{false}, vbar{true};
     double lastPlayheadX = -1;
+    double lastPlayheadPos = 0; // engine position at previous refresh, to detect jumps
     bool firstLayout = true;
     friend class Grid;
 };

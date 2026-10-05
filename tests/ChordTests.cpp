@@ -6,7 +6,7 @@ using namespace mc::theory;
 namespace {
 const Scale aMinor(9, *ScaleRegistry::instance().find("natural_minor"));
 const Scale cMajor(0, *ScaleRegistry::instance().find("major"));
-constexpr int A3 = 57, B3 = 59, C4 = 60, D4 = 62, E4 = 64, F4 = 65, G4 = 67, A4 = 69, B4 = 71, C5 = 72;
+constexpr int A3 = 57, B3 = 59, C4 = 60, D4 = 62, E4 = 64, F4 = 65, G4 = 67, A4 = 69, B4 = 71;
 using V = std::vector<int>;
 ChordResult chord(const Scale& s, int n, Extension e = Extension::Triad, int inv = 0) { return ChordEngine::build(s, {n, e, inv}); }
 }
@@ -24,8 +24,12 @@ TEST(a_minor_diatonic_triads)
 
 TEST(inversions)
 {
-    CHECK_EQ(chord(aMinor, A3, Extension::Triad, 1).notes, (V{C4, E4, A4}));
-    CHECK_EQ(chord(aMinor, A3, Extension::Triad, 2).notes, (V{E4, A4, C5}));
+    // The played note (A3) never moves; top notes drop below it.
+    CHECK_EQ(chord(aMinor, A3, Extension::Triad, 1).notes, (V{E4 - 12, A3, C4}));
+    CHECK_EQ(chord(aMinor, A3, Extension::Triad, 2).notes, (V{C4 - 12, E4 - 12, A3}));
+    // C3 E3 G3 -> G2 C3 E3 -> E2 G2 C3
+    CHECK_EQ(chord(cMajor, 48, Extension::Triad, 1).notes, (V{43, 48, 52}));
+    CHECK_EQ(chord(cMajor, 48, Extension::Triad, 2).notes, (V{40, 43, 48}));
 }
 
 TEST(sevenths_and_ninths)
@@ -44,9 +48,9 @@ TEST(sevenths_and_ninths)
 
 TEST(spec_example_am7_first_inversion)
 {
-    // Root A, Natural Minor, played A, extension 7, inversion 1 -> C E G A
+    // Root A, Natural Minor, played A3, extension 7, inversion 1 -> G3 A3 C4 E4
     auto r = chord(aMinor, A3, Extension::Seventh, 1);
-    CHECK_EQ(r.notes, (V{C4, E4, G4, A4}));
+    CHECK_EQ(r.notes, (V{G4 - 12, A3, C4, E4}));
     CHECK_EQ(r.description, std::string("Am7 \xE2\x80\x93 1st inversion"));
 }
 

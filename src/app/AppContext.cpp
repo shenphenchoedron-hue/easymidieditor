@@ -1,5 +1,6 @@
 #include "AppContext.h"
 #include "io/MidiFile.h"
+#include "io/MusicXml.h"
 #include "io/ProjectSerializer.h"
 #include "plugins/BasicSynth.h"
 
@@ -202,6 +203,13 @@ bool AppContext::exportMidi(const juce::File& f, juce::String& error)
 {
     std::string e;
     if (!io::MidiFile::writeFile(project, f.getFullPathName().toStdString(), &e)) { error = e; return false; }
+    return true;
+}
+
+bool AppContext::exportMusicXml(const juce::File& f, juce::String& error)
+{
+    std::string e;
+    if (!io::MusicXml::writeFile(project, f.getFullPathName().toStdString(), &e)) { error = e; return false; }
     return true;
 }
 

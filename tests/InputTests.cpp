@@ -29,7 +29,7 @@ TEST(chord_mode_with_modifiers)
     CHECK(p.noteOn(m[Modifier::Inversion1], 100).empty()); // consumed, silent
     CHECK(p.noteOn(m[Modifier::Seventh], 100).empty());
     auto ev = p.noteOn(57, 90);
-    CHECK_EQ(ons(ev), (std::vector<int>{60, 64, 67, 69}));
+    CHECK_EQ(ons(ev), (std::vector<int>{55, 57, 60, 64})); // A3 stays, G drops below
     CHECK_EQ(p.displayState().currentChord, std::string("Am7 \xE2\x80\x93 1st inversion"));
     auto off = p.noteOff(57);
     CHECK_EQ(off.size(), (size_t)4);
