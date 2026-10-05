@@ -26,6 +26,7 @@ public:
     bool solo = false;
     float volume = 0.8f;   // linear gain 0..1
     float pan = 0.0f;      // -1..1
+    std::uint32_t colour = 0; // 0xAARRGGBB for the track header, 0 = default theme colour
 
 protected:
     TrackId id_;

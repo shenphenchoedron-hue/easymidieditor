@@ -17,7 +17,7 @@ static Project sample()
     p.harmony = {2, "major", true};
     p.controllerMapping.notes[2] = 41;
     auto& t = p.addMidiTrack("Keys \"1\"");
-    t.channel = 3; t.volume = 0.5f; t.pan = -0.25f; t.mute = true;
+    t.channel = 3; t.colour = 0xff5578d1; t.volume = 0.5f; t.pan = -0.25f; t.mute = true;
     t.plugin = {"VST3", "/x/Synth.vst3|1234", "Synth", "ACME", "AAEC", true};
     t.addNote({0, 57, 101, 0, 960, -1});
     t.addNote({0, 64, 80, 480, 240, 5});
@@ -53,6 +53,7 @@ TEST(project_roundtrip)
     auto* t = dynamic_cast<MidiTrack*>(q.tracks()[0].get());
     CHECK_EQ(t->name, std::string("Keys \"1\""));
     CHECK_EQ(t->channel, 3);
+    CHECK_EQ(t->colour, 0xff5578d1u);
     CHECK(t->mute);
     CHECK_EQ(t->plugin.stateBase64, std::string("AAEC"));
     CHECK(t->plugin.bypassed);

@@ -104,14 +104,14 @@ void RemoveTrackCommand::revert(Project& p)
 TrackProperties TrackProperties::from(const Track& t)
 {
     TrackProperties tp;
-    tp.name = t.name; tp.mute = t.mute; tp.solo = t.solo; tp.volume = t.volume; tp.pan = t.pan;
+    tp.name = t.name; tp.mute = t.mute; tp.solo = t.solo; tp.volume = t.volume; tp.pan = t.pan; tp.colour = t.colour;
     if (auto* m = dynamic_cast<const MidiTrack*>(&t)) { tp.channel = m->channel; tp.plugin = m->plugin; }
     return tp;
 }
 
 void TrackProperties::applyTo(Track& t) const
 {
-    t.name = name; t.mute = mute; t.solo = solo; t.volume = volume; t.pan = pan;
+    t.name = name; t.mute = mute; t.solo = solo; t.volume = volume; t.pan = pan; t.colour = colour;
     if (auto* m = dynamic_cast<MidiTrack*>(&t)) { m->channel = channel; m->plugin = plugin; }
 }
 

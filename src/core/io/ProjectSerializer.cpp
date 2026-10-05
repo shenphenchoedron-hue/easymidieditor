@@ -34,6 +34,7 @@ std::string ProjectSerializer::toString(const Project& p)
         jt.set("solo", t->solo);
         jt.set("volume", t->volume);
         jt.set("pan", t->pan);
+        if (t->colour) jt.set("colour", (long long)t->colour);
         if (auto* m = dynamic_cast<const MidiTrack*>(t.get())) {
             jt.set("type", "midi");
             jt.set("channel", m->channel);
@@ -114,6 +115,7 @@ LoadResult ProjectSerializer::fromString(const std::string& text, Project& out)
         t->solo = jt["solo"].boolean(false);
         t->volume = (float)jt["volume"].num(0.8);
         t->pan = (float)jt["pan"].num(0.0);
+        t->colour = (std::uint32_t)jt["colour"].num(0);
         if (p.track(id)) continue; // duplicate id: skip rather than corrupt
         p.insertTrack((int)p.tracks().size(), std::move(t));
     }

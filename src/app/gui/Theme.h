@@ -46,6 +46,13 @@ inline const juce::Colour keyBlack{0xff222a33};
 inline const juce::Colour keyLine{0xffcfd6dd};
 } // namespace col
 
+// Muted palette for track headers (name, colour)
+inline const std::array<std::pair<const char*, juce::Colour>, 10> trackPalette{{
+    {"Cyan", juce::Colour(0xff35a9c8)}, {"Blue", juce::Colour(0xff5578d1)}, {"Lavender", juce::Colour(0xff8a7cc8)},
+    {"Rose", juce::Colour(0xffc77a98)}, {"Red", juce::Colour(0xffd46a6a)}, {"Orange", juce::Colour(0xffe08f4f)},
+    {"Sand", juce::Colour(0xffd6b25e)}, {"Olive", juce::Colour(0xff9aac5a)}, {"Green", juce::Colour(0xff5aae84)},
+    {"Slate", juce::Colour(0xff7d8a98)}}};
+
 // spacing
 inline constexpr int gapS = 4, gap = 8, gapGroup = 12, gapSection = 16;
 inline constexpr float radius = 5.0f;

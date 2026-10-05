@@ -10,7 +10,7 @@ class TrackListComponent::Row final : public juce::Component {
 public:
     Row(AppContext& a, model::TrackId i) : app(a), id(i)
     {
-        for (juce::Component* c : std::initializer_list<juce::Component*>{&name, &mute, &solo, &volume, &pan, &channel, &pluginBtn, &editBtn})
+        for (juce::Component* c : std::initializer_list<juce::Component*>{&colourBtn, &name, &mute, &solo, &volume, &pan, &channel, &pluginBtn, &editBtn})
             addAndMakeVisible(c);
         name.setEditable(false, true);
         name.setFont(theme::uiFont(14.0f, true));
@@ -52,6 +52,8 @@ public:
         channel.onChange = [this] { change([&](auto& p) { p.channel = channel.getSelectedId() - 1; }); };
 
         pluginBtn.onClick = [this] { showPluginMenu(); };
+        colourBtn.setTooltip("Track colour");
+        colourBtn.onClick = [this] { showColourMenu(); };
         editBtn.setTooltip("Open plugin editor");
         editBtn.onClick = [this] { app.openPluginEditor(id); };
         refresh();
@@ -77,13 +79,27 @@ public:
         auto* inst = app.engine->instrument(id);
         editBtn.setEnabled(inst && inst->hasEditor());
         active = app.project.activeTrack == id;
+        colour = t->colour;
+        colourBtn.colour = colour ? juce::Colour(colour) : theme::col::border;
+        colourBtn.repaint();
         repaint();
     }
 
     void paint(juce::Graphics& g) override
     {
-        g.fillAll(active ? theme::col::accentSoft : theme::col::panel);
-        if (active) { g.setColour(theme::col::accent); g.fillRect(0, 0, 3, getHeight()); }
+        if (colour) {
+            const juce::Colour tc(colour);
+            g.fillAll(theme::col::panel.interpolatedWith(tc, active ? 0.30f : 0.15f));
+            g.setColour(tc);
+            g.fillRect(0, 0, active ? 5 : 3, getHeight());
+            if (active) {
+                g.setColour(tc.withAlpha(0.8f));
+                g.drawRect(getLocalBounds().withTrimmedLeft(5).withTrimmedBottom(1), 1);
+            }
+        } else {
+            g.fillAll(active ? theme::col::accentSoft : theme::col::panel);
+            if (active) { g.setColour(theme::col::accent); g.fillRect(0, 0, 3, getHeight()); }
+        }
         g.setColour(theme::col::borderSoft);
         g.drawHorizontalLine(getHeight() - 1, 0, (float)getWidth());
     }
@@ -99,6 +115,7 @@ public:
         l1.removeFromRight(gap);
         channel.setBounds(l1.removeFromRight(72));
         l1.removeFromRight(gapS);
+        colourBtn.setBounds(l1.removeFromLeft(18).withSizeKeepingCentre(16, 16));
         name.setBounds(l1);
         r.removeFromTop(gapS);
         auto l2 = r.removeFromTop(16);
@@ -123,6 +140,40 @@ private:
         auto after = before;
         f(after);
         app.undo.perform(std::make_unique<model::SetTrackPropertiesCommand>(id, before, after));
+    }
+
+    void showColourMenu()
+    {
+        app.selectTrack(id);
+        juce::PopupMenu m;
+        auto swatch = [](juce::Colour c) {
+            juce::Image img(juce::Image::ARGB, 14, 14, true);
+            juce::Graphics g(img);
+            g.setColour(c);
+            g.fillRoundedRectangle(1, 1, 12, 12, 3);
+            auto d = std::make_unique<juce::DrawableImage>();
+            d->setImage(img);
+            return d;
+        };
+        juce::PopupMenu::Item def("Default");
+        def.itemID = 1;
+        def.isTicked = colour == 0;
+        m.addItem(std::move(def));
+        m.addSeparator();
+        for (size_t i = 0; i < theme::trackPalette.size(); ++i) {
+            const auto& [label, c] = theme::trackPalette[i];
+            juce::PopupMenu::Item it(label);
+            it.itemID = (int)i + 10;
+            it.isTicked = colour == c.getARGB();
+            it.image = swatch(c);
+            m.addItem(std::move(it));
+        }
+        juce::Component::SafePointer<Row> self(this);
+        m.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(&colourBtn), [self](int r) {
+            if (!self || r == 0) return;
+            const std::uint32_t argb = r == 1 ? 0u : theme::trackPalette[(size_t)(r - 10)].second.getARGB();
+            self->change([argb](model::TrackProperties& p) { p.colour = argb; });
+        });
     }
 
     void showPluginMenu()
@@ -158,9 +209,24 @@ private:
         });
     }
 
+    struct Swatch final : juce::Button {
+        Swatch() : juce::Button("colour") {}
+        juce::Colour colour;
+        void paintButton(juce::Graphics& g, bool over, bool) override
+        {
+            auto r = getLocalBounds().toFloat().reduced(1.5f);
+            g.setColour(colour);
+            g.fillEllipse(r);
+            g.setColour(over ? theme::col::accent : colour.darker(0.25f));
+            g.drawEllipse(r, 1.0f);
+        }
+    };
+
     AppContext& app;
     model::TrackId id;
     bool active = false;
+    std::uint32_t colour = 0;
+    Swatch colourBtn;
     std::optional<model::TrackProperties> dragBefore;
     juce::Label name;
     juce::TextButton mute{"M"}, solo{"S"}, pluginBtn, editBtn{"E"};

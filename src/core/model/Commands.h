@@ -104,6 +104,7 @@ struct TrackProperties {
     bool mute = false, solo = false;
     float volume = 0.8f, pan = 0.0f;
     int channel = 0;
+    std::uint32_t colour = 0;
     PluginReference plugin;
     static TrackProperties from(const Track&);
     void applyTo(Track&) const;
