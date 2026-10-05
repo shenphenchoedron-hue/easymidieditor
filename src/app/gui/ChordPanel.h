@@ -1,5 +1,6 @@
 #pragma once
 #include "AppContext.h"
+#include "theory/ChordSuggestions.h"
 
 namespace mc::gui {
 
@@ -15,12 +16,20 @@ public:
 private:
     void changeListenerCallback(juce::ChangeBroadcaster*) override;
     void push();
+    void updateSuggestions(int lastRoot);
+    void playSuggestion(size_t i);
 
     AppContext& app;
     juce::Label rootLabel{{}, "Root"}, scaleLabel{{}, "Scale"}, modsLabel{{}, "Modifiers"}, chordLabel;
     juce::ComboBox root, scale;
     juce::TextButton chordMode{"Chord Mode: OFF"};
     std::array<juce::TextButton, (int)input::Modifier::Count> mods;
+
+    // Next-chord suggestions (circle of fifths), shown in chord mode after a chord was played.
+    juce::Label nextLabel{{}, "Next"};
+    std::array<juce::TextButton, 4> nextBtns;
+    std::vector<theory::ChordSuggestion> suggestions;
+    juce::String suggestionKey; // inputs the current suggestions were built from
 };
 
 } // namespace mc::gui

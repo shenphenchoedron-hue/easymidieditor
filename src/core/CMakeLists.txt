@@ -1,6 +1,7 @@
 add_library(mc_core STATIC
     theory/Scale.cpp
     theory/ChordEngine.cpp
+    theory/ChordSuggestions.cpp
     model/Track.cpp
     model/Project.cpp
     model/Commands.cpp

@@ -6,6 +6,7 @@ add_executable(mc_tests
     InputTests.cpp
     IoTests.cpp
     MusicXmlTests.cpp
+    SuggestionTests.cpp
 )
 target_link_libraries(mc_tests PRIVATE mc_core)
 add_test(NAME mc_tests COMMAND mc_tests)

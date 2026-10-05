@@ -94,7 +94,7 @@ ChordDisplayState ChordInputProcessor::displayState() const
     s.chordMode = chordMode_;
     for (int i = 0; i < (int)Modifier::Count; ++i) s.modifiersHeld[(size_t)i] = active((Modifier)i);
     // Re-evaluated with the current modifiers so the display reacts immediately.
-    if (chordMode_ && lastRoot_ >= 0) s.currentChord = chordFor(lastRoot_).description;
+    if (chordMode_ && lastRoot_ >= 0) { s.currentChord = chordFor(lastRoot_).description; s.lastRoot = lastRoot_; }
     for (auto& [p, c] : soundingCount_) s.soundingNotes.push_back(p);
     return s;
 }

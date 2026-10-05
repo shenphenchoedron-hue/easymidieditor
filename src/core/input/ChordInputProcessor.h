@@ -24,6 +24,7 @@ struct ChordDisplayState {
     std::array<bool, (int)Modifier::Count> modifiersHeld{};
     std::string currentChord;        // e.g. "Am7 – 1st inversion" (last/held chord)
     std::vector<int> soundingNotes;  // generated notes currently held
+    int lastRoot = -1;               // played key of the last chord, -1 = none
 };
 
 class ChordInputProcessor {

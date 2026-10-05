@@ -28,7 +28,14 @@ ChordPanel::ChordPanel(AppContext& a) : app(a)
     chordLabel.setColour(juce::Label::textColourId, juce::Colour(0xff6b4a12));
     chordLabel.setJustificationType(juce::Justification::centredLeft);
     chordLabel.setBorderSize({0, 10, 0, 10});
-    for (auto* l : {&rootLabel, &scaleLabel, &modsLabel}) {
+    for (size_t i = 0; i < nextBtns.size(); ++i) {
+        auto& b = nextBtns[i];
+        b.onClick = [this, i] { playSuggestion(i); };
+        addChildComponent(b);
+    }
+    nextLabel.setTooltip("Suggested next chords (circle of fifths). Click to hear one.");
+    addChildComponent(nextLabel);
+    for (auto* l : {&rootLabel, &scaleLabel, &modsLabel, &nextLabel}) {
         l->setFont(theme::uiFont(12.0f));
         l->setColour(juce::Label::textColourId, theme::col::textDim);
         l->setJustificationType(juce::Justification::centredRight);
@@ -69,6 +76,51 @@ void ChordPanel::resized()
     r.removeFromLeft(gapGroup);
     const int textW = (int)juce::GlyphArrangement::getStringWidth(chordLabel.getFont(), chordLabel.getText()) + 24;
     chordLabel.setBounds(r.removeFromLeft(juce::jlimit(120, std::max(120, r.getWidth()), textW)));
+
+    r.removeFromLeft(gapGroup);
+    nextLabel.setBounds(r.removeFromLeft(34));
+    r.removeFromLeft(gapS);
+    for (size_t i = 0; i < nextBtns.size(); ++i) {
+        auto& b = nextBtns[i];
+        const int w = std::max(44, (int)juce::GlyphArrangement::getStringWidth(theme::uiFont(14.0f), b.getButtonText()) + 20);
+        b.setBounds(r.getWidth() >= w ? r.removeFromLeft(w) : juce::Rectangle<int>());
+        r.removeFromLeft(gapS);
+    }
+}
+
+void ChordPanel::updateSuggestions(int lastRoot)
+{
+    const auto& h = app.project.harmony;
+    const juce::String key = juce::String(lastRoot) + "|" + juce::String(h.root) + "|" + juce::String(h.scaleId) + "|" + (h.chordMode ? "1" : "0");
+    if (key == suggestionKey) return;
+    suggestionKey = key;
+
+    suggestions.clear();
+    if (h.chordMode && lastRoot >= 0) {
+        const theory::Scale s(h.root, theory::ScaleRegistry::instance().byIdOrDefault(h.scaleId));
+        suggestions = theory::ChordSuggestions::next(s, lastRoot, theory::Extension::Triad, (int)nextBtns.size());
+    }
+    nextLabel.setVisible(!suggestions.empty());
+    for (size_t i = 0; i < nextBtns.size(); ++i) {
+        auto& b = nextBtns[i];
+        const bool show = i < suggestions.size();
+        b.setVisible(show);
+        if (show) {
+            b.setButtonText(juce::String::fromUTF8(suggestions[i].symbol.c_str()));
+            b.setTooltip(juce::String(suggestions[i].reason));
+        }
+    }
+    resized();
+}
+
+void ChordPanel::playSuggestion(size_t i)
+{
+    if (i >= suggestions.size()) return;
+    const auto& h = app.project.harmony;
+    const theory::Scale s(h.root, theory::ScaleRegistry::instance().byIdOrDefault(h.scaleId));
+    // Use the current modifiers (inversion / 7th / 9th) so it sounds like playing that key.
+    const auto chord = theory::ChordEngine::build(s, app.chordRequestFor(suggestions[i].rootPitch));
+    app.previewNotes(chord.notes, 90, 700);
 }
 
 void ChordPanel::push()
@@ -101,6 +153,7 @@ void ChordPanel::refreshDisplay()
     juce::String text = juce::String(theory::pitchClassName(app.project.harmony.root)) + " " +
                         theory::ScaleRegistry::instance().byIdOrDefault(app.project.harmony.scaleId).displayName;
     if (d.chordMode) text += "   |   Chord: " + juce::String::fromUTF8(d.currentChord.empty() ? "-" : d.currentChord.c_str());
+    updateSuggestions(d.chordMode ? d.lastRoot : -1);
     if (text != chordLabel.getText()) {
         chordLabel.setText(text, juce::dontSendNotification);
         resized();
