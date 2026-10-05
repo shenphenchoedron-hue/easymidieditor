@@ -214,8 +214,9 @@ public:
                 auto r = noteRect(n);
                 if (!r.intersects(bounds)) continue;
                 const bool sel = roll.selection.count(n.id) > 0;
-                // Active track in full colour; soft notes only slightly darker.
+                // Active track in full colour; soft notes only slightly darker. Red = about to be deleted.
                 auto c = (sel ? kNoteSel : base).interpolatedWith(kBg, 0.20f * (1.0f - (float)n.velocity / 127.0f));
+                if (pendingDelete.count(n.id)) c = kRec.withAlpha(0.85f);
                 const auto nr = r.reduced(0.5f, 1.0f);
                 g.setColour(c);
                 g.fillRoundedRectangle(nr, 3.0f);
@@ -235,9 +236,10 @@ public:
         }
 
         if (rubber) {
-            g.setColour(juce::Colours::white.withAlpha(0.15f));
+            const auto c = mode == Mode::RubberDelete ? kRec : juce::Colours::white; // red = delete box
+            g.setColour(c.withAlpha(0.15f));
             g.fillRect(*rubber);
-            g.setColour(juce::Colours::white);
+            g.setColour(c);
             g.drawRect(*rubber);
         }
 
@@ -279,11 +281,14 @@ public:
         downPitch = roll.yToPitch(e.y);
         const Note* hit = noteAt(e.position);
 
-        if (e.mods.isPopupMenu()) { // right click deletes
-            if (hit) {
-                roll.selection.erase(hit->id);
-                app.undo.perform(std::make_unique<model::RemoveNotesCommand>(track->id(), std::vector<model::NoteId>{hit->id}));
-            }
+        if (e.mods.isPopupMenu()) {
+            // Right click on a note deletes it. Right-drag draws a delete box:
+            // every note touched by the box is deleted on release (one undo step).
+            mode = Mode::RubberDelete;
+            rubberStart = e.position;
+            pendingDelete.clear();
+            if (hit) pendingDelete.insert(hit->id);
+            repaint();
             return;
         }
 
@@ -329,6 +334,13 @@ public:
     {
         auto* track = roll.app.activeMidiTrack();
         if (!track) return;
+        if (mode == Mode::RubberDelete) {
+            rubber = juce::Rectangle<float>(rubberStart, e.position);
+            pendingDelete.clear();
+            for (auto& n : track->notes()) if (noteRect(n).intersects(*rubber) || noteRect(n).contains(rubberStart)) pendingDelete.insert(n.id);
+            repaint();
+            return;
+        }
         if (mode == Mode::Rubber) {
             rubber = juce::Rectangle<float>(rubberStart, e.position);
             std::set<model::NoteId> sel = e.mods.isShiftDown() ? roll.selection : std::set<model::NoteId>{};
@@ -366,6 +378,17 @@ public:
     {
         auto* track = roll.app.activeMidiTrack();
         rubber.reset();
+        if (mode == Mode::RubberDelete) {
+            mode = Mode::None;
+            if (track && !pendingDelete.empty()) {
+                for (auto id : pendingDelete) roll.selection.erase(id);
+                const std::vector<model::NoteId> ids(pendingDelete.begin(), pendingDelete.end());
+                pendingDelete.clear();
+                roll.app.undo.perform(std::make_unique<model::RemoveNotesCommand>(track->id(), ids));
+            }
+            repaint();
+            return;
+        }
         if (track && changed && (mode == Mode::Move || mode == Mode::Resize)) {
             std::vector<Note> after;
             for (auto& o : original) if (auto* n = track->findNote(o.id)) after.push_back(*n);
@@ -394,7 +417,8 @@ public:
     Tick lastLength = model::kPPQ / 2;
 
 private:
-    enum class Mode { None, Move, Resize, Rubber };
+    enum class Mode { None, Move, Resize, Rubber, RubberDelete };
+    std::set<model::NoteId> pendingDelete; // notes inside the right-drag delete box
     void beginDrag(const model::MidiTrack& t)
     {
         original.clear();
