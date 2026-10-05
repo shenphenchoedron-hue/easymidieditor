@@ -57,17 +57,23 @@ std::unique_ptr<plugins::InstrumentPlugin> AudioEngine::setInstrument(model::Tra
     return p;
 }
 
+// `slots` and each Slot::plugin are only ever modified on the message thread
+// (under slotLock, so the audio thread never sees a half-done change). Reading
+// them from the message thread therefore needs no lock. Taking the lock here
+// would make every UI action wait for the audio thread to finish rendering
+// (which can take most of a block with heavy plugins like Kontakt), and would
+// make the audio thread drop blocks whenever the UI held the lock.
 plugins::InstrumentPlugin* AudioEngine::instrument(model::TrackId id) const
 {
-    const juce::ScopedLock l(slotLock);
+    jassert(juce::MessageManager::existsAndIsCurrentThread());
     auto* s = findSlot(id);
     return s ? s->plugin.get() : nullptr;
 }
 
 void AudioEngine::setBypassed(model::TrackId id, bool b)
 {
-    const juce::ScopedLock l(slotLock);
-    if (auto* s = findSlot(id)) s->bypassed = b;
+    jassert(juce::MessageManager::existsAndIsCurrentThread());
+    if (auto* s = findSlot(id)) s->bypassed = b; // atomic, read by the audio thread
 }
 
 std::unique_ptr<plugins::InstrumentPlugin> AudioEngine::removeTrack(model::TrackId id)
@@ -83,7 +89,7 @@ std::unique_ptr<plugins::InstrumentPlugin> AudioEngine::removeTrack(model::Track
 
 std::vector<model::TrackId> AudioEngine::trackIds() const
 {
-    const juce::ScopedLock l(slotLock);
+    jassert(juce::MessageManager::existsAndIsCurrentThread()); // see instrument()
     std::vector<model::TrackId> ids;
     for (auto& s : slots) ids.push_back(s->id);
     return ids;

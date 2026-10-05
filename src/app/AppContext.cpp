@@ -401,7 +401,9 @@ void AppContext::handleKeyboardNote(bool on, int pitch, int velocity)
     sendLive(out);
     if (learned)
         juce::MessageManager::callAsync([this, mapping] { setControllerMapping(mapping); });
-    juce::MessageManager::callAsync([this] { sendChangeMessage(); }); // refresh chord display
+    // The chord display is refreshed by MainComponent's 30 Hz timer. Broadcasting a
+    // change per note would rebuild the menu bar, track list and piano roll on
+    // every key press, which makes playing laggy with heavy plugins open.
 }
 
 void AppContext::handleMidi(const juce::MidiMessage& m)

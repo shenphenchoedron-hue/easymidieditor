@@ -44,7 +44,7 @@ private:
     struct Slot {
         model::TrackId id = 0;
         std::unique_ptr<plugins::InstrumentPlugin> plugin;
-        bool bypassed = false;
+        std::atomic<bool> bypassed{false};
         juce::MidiBuffer midi;
         std::bitset<16 * 128> held;    // notes sent by the sequencer
     };
