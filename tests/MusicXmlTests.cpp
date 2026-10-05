@@ -1,5 +1,6 @@
 #include "Test.h"
 #include "io/MusicXml.h"
+#include <algorithm>
 
 using namespace mc;
 using namespace mc::model;
