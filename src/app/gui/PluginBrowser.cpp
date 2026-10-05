@@ -4,26 +4,51 @@
 namespace mc::gui {
 
 namespace {
-class ScanThread final : public juce::ThreadWithProgressWindow {
+// Runs the scan loop on a worker thread; the plugin loading itself is marshalled
+// to the message thread by the host. The message thread must therefore never
+// block waiting for this thread (ThreadWithProgressWindow does on cancel, which
+// would deadlock), so cancellation only signals and completion is polled.
+class ScanThread final : public juce::Thread, private juce::Timer {
 public:
     ScanThread(AppContext& a, std::function<void()> d)
-        : ThreadWithProgressWindow("Scanning plugins...", true, true), app(a), done(std::move(d)) {}
+        : Thread("Plugin scan"), app(a), done(std::move(d)),
+          window("Scanning plugins...", {}, juce::MessageBoxIconType::NoIcon)
+    {
+        window.addProgressBarComponent(progress);
+        window.addButton("Cancel", 1);
+        window.enterModalState(true, juce::ModalCallbackFunction::create([this](int) { signalThreadShouldExit(); }), false);
+    }
+    void launch()
+    {
+        startThread();
+        startTimer(100);
+    }
     void run() override
     {
         app.plugins->rescan([this](float f, const juce::String& item) {
-            setProgress(f);
-            setStatusMessage(item);
+            progress = f;
+            { const juce::ScopedLock sl(lock); message = item; }
             return !threadShouldExit();
         });
     }
-    void threadComplete(bool) override
+private:
+    void timerCallback() override
     {
+        { const juce::ScopedLock sl(lock); window.setMessage(message); }
+        if (isThreadRunning()) return;
+        stopTimer();
+        if (window.isCurrentlyModal()) window.exitModalState(0);
+        window.setVisible(false);
         if (done) done();
         delete this;
     }
-private:
+
     AppContext& app;
     std::function<void()> done;
+    double progress = 0.0;
+    juce::CriticalSection lock;
+    juce::String message;
+    juce::AlertWindow window;
 };
 
 class BrowserWindow final : public juce::DocumentWindow {
@@ -52,7 +77,7 @@ enum Col { Name = 1, Manufacturer, Format, Category };
 
 void PluginBrowser::rescanWithProgress(AppContext& app, std::function<void()> done)
 {
-    (new ScanThread(app, std::move(done)))->launchThread();
+    (new ScanThread(app, std::move(done)))->launch();
 }
 
 void PluginBrowser::show(AppContext& app, Choose onChoose) { new BrowserWindow(app, std::move(onChoose)); }

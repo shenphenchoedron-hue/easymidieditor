@@ -79,8 +79,17 @@ std::vector<PluginInfo> JucePluginHost::scan(const std::function<bool(float, con
             if (progress && !progress(((float)fi + scanner.getProgress()) / (float)nFormats, format->getName() + ": " + current))
                 return out;
             bool more = false;
-            try { more = scanner.scanNextFile(true, current); }
-            catch (...) { more = true; } // defective plugin threw: skip it
+            // Plugins must be loaded on the message thread: many (e.g. Native
+            // Instruments' Qt-based ones) touch AppKit/HIToolbox or X11 during
+            // load and abort the process when called from a worker thread.
+            auto doScan = [&] {
+                try { more = scanner.scanNextFile(true, current); }
+                catch (...) { more = true; } // defective plugin threw: skip it
+            };
+            if (auto* mm = juce::MessageManager::getInstanceWithoutCreating(); mm != nullptr && !mm->isThisTheMessageThread())
+                mm->callFunctionOnMessageThread([](void* f) -> void* { (*static_cast<decltype(doScan)*>(f))(); return nullptr; }, &doScan);
+            else
+                doScan();
             if (!more) break;
         }
     }
