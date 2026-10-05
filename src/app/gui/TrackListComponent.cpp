@@ -210,7 +210,7 @@ public:
         channel.setSelectedId(t->channel + 1, juce::dontSendNotification);
         const bool missing = app.isPluginMissing(id);
         juce::String label = t->plugin.empty() ? "(no instrument)" : juce::String(t->plugin.name);
-        if (missing) label = "Plugin mangler: " + label;
+        if (missing) label = "Plugin missing: " + label;
         else if (t->plugin.bypassed) label += " [bypass]";
         pluginBtn.setButtonText(label);
         pluginBtn.setTooltip(missing ? app.pluginError(id) : juce::String(t->plugin.format + " - " + t->plugin.manufacturer));

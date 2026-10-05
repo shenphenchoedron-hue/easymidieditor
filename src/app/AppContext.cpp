@@ -247,6 +247,20 @@ void AppContext::openSoundsFolder()
         "\n\nThen choose Options > Rescan plugins. The sounds appear under SoundFonts in each track's instrument menu.");
 }
 
+void AppContext::openManual()
+{
+    // Same places as the bundled SoundFont: app bundle Resources (macOS),
+    // next to the executable (Windows/Linux tarball), /usr/share/doc (Debian).
+    const auto exe = juce::File::getSpecialLocation(juce::File::currentExecutableFile);
+    const auto app = juce::File::getSpecialLocation(juce::File::currentApplicationFile);
+    const juce::String name = "MIDI-Composer-Manual.pdf";
+    for (auto& f : {app.getChildFile("Contents/Resources").getChildFile(name),
+                    exe.getParentDirectory().getChildFile(name),
+                    juce::File("/usr/share/doc/midi-composer").getChildFile(name)})
+        if (f.existsAsFile() && f.startAsProcess()) return;
+    juce::URL("https://github.com/shenphenchoedron-hue/easymidieditor/releases/latest").launchInDefaultBrowser();
+}
+
 void AppContext::showAbout()
 {
     juce::String text;
@@ -255,7 +269,9 @@ void AppContext::showAbout()
          << "https://www.schristiancollins.com/generaluser\n\n"
          << "SoundFont playback: TinySoundFont by Bernhard Schelling (MIT license)\n"
          << "https://github.com/schellingb/TinySoundFont\n\n"
-         << "Made with JUCE.";
+         << "Made with JUCE.\n\n"
+         << "Manual: Options > User manual (English). A Danish manual is available on the\n"
+         << "Releases page: https://github.com/shenphenchoedron-hue/easymidieditor/releases";
     if (auto f = plugins::soundfont::builtinFile(); f.existsAsFile())
         text << "\n\nLicense of the built-in sounds:\n" << f.getSiblingFile(plugins::kBuiltinSoundFontLicense).getFullPathName();
     juce::AlertWindow::showMessageBoxAsync(juce::MessageBoxIconType::InfoIcon, "About MIDI Composer", text);

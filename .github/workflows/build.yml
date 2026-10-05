@@ -65,14 +65,15 @@ jobs:
           ART=build/src/app/MidiComposer_artefacts/Release
           mkdir -p dist
           if [ "$RUNNER_OS" == "Windows" ]; then
-            7z a "dist/${{ matrix.artifact }}.zip" "./$ART/MIDI Composer.exe" "./$ART/GeneralUser-GS.sf2" "./$ART/GeneralUser-GS-LICENSE.txt" README.md LICENSE
+            7z a "dist/${{ matrix.artifact }}.zip" "./$ART/MIDI Composer.exe" "./$ART/GeneralUser-GS.sf2" "./$ART/GeneralUser-GS-LICENSE.txt" "./$ART/MIDI-Composer-Manual.pdf" README.md LICENSE
           elif [ "$RUNNER_OS" == "macOS" ]; then
             lipo -info "$ART/MIDI Composer.app/Contents/MacOS/MIDI Composer"
             test -f "$ART/MIDI Composer.app/Contents/Resources/GeneralUser-GS.sf2"
+            test -f "$ART/MIDI Composer.app/Contents/Resources/MIDI-Composer-Manual.pdf"
             ditto -c -k --keepParent "$ART/MIDI Composer.app" "dist/${{ matrix.artifact }}.zip"
           else
             mkdir -p pkg/MIDI-Composer
-            cp "$ART/MIDI Composer" "$ART/GeneralUser-GS.sf2" "$ART/GeneralUser-GS-LICENSE.txt" README.md LICENSE pkg/MIDI-Composer/
+            cp "$ART/MIDI Composer" "$ART/GeneralUser-GS.sf2" "$ART/GeneralUser-GS-LICENSE.txt" "$ART/MIDI-Composer-Manual.pdf" README.md LICENSE pkg/MIDI-Composer/
             cp resources/icon.png pkg/MIDI-Composer/
             tar -czf "dist/${{ matrix.artifact }}.tar.gz" -C pkg MIDI-Composer
           fi
@@ -115,10 +116,13 @@ jobs:
     needs: [build, debian]
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
           path: dist
           merge-multiple: true
+      - name: Add manuals (English + Danish)
+        run: cp docs/MIDI-Composer-Manual.pdf docs/MIDI-Composer-Manual-da.pdf dist/
       - uses: softprops/action-gh-release@v2
         with:
           files: dist/*

@@ -40,6 +40,7 @@ public:
     bool importMusicXml(const juce::File&, juce::String& error); // .musicxml, .xml, .mxl
     void openSoundsFolder();   // reveals the user's .sf2 folder in Finder/Explorer
     void showAbout();          // version + third-party credits
+    void openManual();         // bundled English PDF manual; falls back to the GitHub Releases page
     juce::File currentFile;
     bool hasUnsavedChanges() const { return dirty; }
 

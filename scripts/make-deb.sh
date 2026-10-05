@@ -19,6 +19,7 @@ ART="$(dirname "$BIN")"
 install -Dm644 "$ART/GeneralUser-GS.sf2" "$PKG/usr/share/midi-composer/GeneralUser-GS.sf2"
 install -Dm644 "$ART/GeneralUser-GS-LICENSE.txt" "$PKG/usr/share/midi-composer/GeneralUser-GS-LICENSE.txt"
 install -Dm644 "$ART/GeneralUser-GS-LICENSE.txt" "$PKG/usr/share/doc/midi-composer/GeneralUser-GS-LICENSE.txt"
+install -Dm644 "$ART/MIDI-Composer-Manual.pdf" "$PKG/usr/share/doc/midi-composer/MIDI-Composer-Manual.pdf"
 
 mkdir -p "$PKG/usr/share/applications"
 cat > "$PKG/usr/share/applications/midi-composer.desktop" <<DESK

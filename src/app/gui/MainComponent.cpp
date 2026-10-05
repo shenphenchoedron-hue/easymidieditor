@@ -9,7 +9,7 @@ namespace {
 enum MenuId {
     New = 1, Open, Save, SaveAs, ImportMidi, ImportMusicXml, ExportMidi, ExportMusicXml, Quit,
     Undo = 100, Redo, Cut, Copy, Paste, Delete, SelectAll, AddTrack, DeleteTrack,
-    Settings = 200, Plugins, Rescan, SoundsFolder, About
+    Settings = 200, Plugins, Rescan, SoundsFolder, Manual, About
 };
 const char* kProjectExt = "*.mcproj";
 }
@@ -131,6 +131,7 @@ juce::PopupMenu MainComponent::getMenuForIndex(int idx, const juce::String&)
         m.addItem(Rescan, "Rescan plugins");
         m.addItem(SoundsFolder, "Open Sounds folder (add .sf2 files)...");
         m.addSeparator();
+        m.addItem(Manual, "User manual");
         m.addItem(About, "About MIDI Composer...");
     }
     return m;
@@ -165,6 +166,7 @@ void MainComponent::menuItemSelected(int id, int)
         }
         case Rescan: PluginBrowser::rescanWithProgress(app, {}); break;
         case SoundsFolder: app.openSoundsFolder(); break;
+        case Manual: app.openManual(); break;
         case About: app.showAbout(); break;
         default: break;
     }
@@ -200,7 +202,7 @@ void MainComponent::openDialog()
             if (!app.openProject(f, err)) showError("Could not open project:\n" + err);
             else if (err.isNotEmpty()) showError(err);
             for (auto& t : app.project.tracks())
-                if (app.isPluginMissing(t->id())) { showError("Some instrument plugins are missing. Their tracks are marked \"Plugin mangler\"; MIDI data is intact."); break; }
+                if (app.isPluginMissing(t->id())) { showError("Some instrument plugins are missing. Their tracks are marked \"Plugin missing\"; MIDI data is intact."); break; }
         });
     });
 }
