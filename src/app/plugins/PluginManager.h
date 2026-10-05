@@ -17,6 +17,8 @@ public:
     // Background-thread safe. Replaces the cache; persists it.
     void rescan(const std::function<bool(float, const juce::String&)>& progress);
     bool hasCache() const { return cacheFile.existsAsFile(); }
+    // Folder where users drop extra .sf2 files (picked up by the next rescan).
+    juce::File userSoundsFolder() const { return userSounds; }
 
     const PluginInfo* find(const model::PluginReference&) const;
     static model::PluginReference referenceFor(const PluginInfo&);
@@ -29,7 +31,7 @@ private:
     void loadCache();
     void saveCache() const;
 
-    juce::File cacheFile;
+    juce::File cacheFile, userSounds;
     std::vector<std::unique_ptr<InstrumentPluginHost>> hosts;
     std::vector<PluginInfo> plugins_;
     mutable std::mutex mutex;

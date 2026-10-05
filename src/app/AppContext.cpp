@@ -3,6 +3,8 @@
 #include "io/MusicXml.h"
 #include "io/ProjectSerializer.h"
 #include "plugins/BasicSynth.h"
+#include "plugins/BuiltinInstruments.h"
+#include "plugins/SoundFontPlayer.h"
 
 namespace mc {
 
@@ -25,7 +27,7 @@ private:
 
 model::PluginReference defaultInstrument()
 {
-    return plugins::PluginManager::referenceFor(plugins::InternalPluginHost::basicSynthInfo());
+    return plugins::PluginManager::referenceFor(plugins::InternalPluginHost::defaultInstrument());
 }
 } // namespace
 
@@ -233,6 +235,30 @@ bool AppContext::importMusicXml(const juce::File& f, juce::String& error)
     addImportedTracks(imported);
     if (r.hasKey) setHarmony(r.harmony.root, r.harmony.scaleId, project.harmony.chordMode);
     return true;
+}
+
+void AppContext::openSoundsFolder()
+{
+    const auto folder = plugins->userSoundsFolder();
+    folder.createDirectory();
+    folder.startAsProcess();
+    juce::AlertWindow::showMessageBoxAsync(juce::MessageBoxIconType::InfoIcon, "Add your own sounds",
+        "Copy SoundFont files (.sf2) into the folder that just opened:\n\n" + folder.getFullPathName() +
+        "\n\nThen choose Options > Rescan plugins. The sounds appear under SoundFonts in each track's instrument menu.");
+}
+
+void AppContext::showAbout()
+{
+    juce::String text;
+    text << "MIDI Composer " << JUCE_APPLICATION_VERSION_STRING << "\n\n"
+         << "Built-in instruments: GeneralUser GS by S. Christian Collins\n"
+         << "https://www.schristiancollins.com/generaluser\n\n"
+         << "SoundFont playback: TinySoundFont by Bernhard Schelling (MIT license)\n"
+         << "https://github.com/schellingb/TinySoundFont\n\n"
+         << "Made with JUCE.";
+    if (auto f = plugins::soundfont::builtinFile(); f.existsAsFile())
+        text << "\n\nLicense of the built-in sounds:\n" << f.getSiblingFile(plugins::kBuiltinSoundFontLicense).getFullPathName();
+    juce::AlertWindow::showMessageBoxAsync(juce::MessageBoxIconType::InfoIcon, "About MIDI Composer", text);
 }
 
 void AppContext::addImportedTracks(const model::Project& imported)

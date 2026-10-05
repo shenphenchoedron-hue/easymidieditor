@@ -16,6 +16,7 @@ target_sources(MidiComposer PRIVATE
     midi/MidiDeviceManager.cpp
     recording/Recorder.cpp
     plugins/BasicSynth.cpp
+    plugins/SoundFontPlayer.cpp
     plugins/JucePluginHost.cpp
     plugins/ClapPluginHost.cpp
     plugins/PluginManager.cpp
@@ -60,3 +61,41 @@ target_link_libraries(MidiComposer PRIVATE
     juce::juce_recommended_config_flags
     juce::juce_recommended_lto_flags
     juce::juce_recommended_warning_flags)
+
+# ---------------------------------------------------------------------------
+# Built-in instruments: GeneralUser GS SoundFont by S. Christian Collins
+# (https://www.schristiancollins.com/generaluser). Downloaded from its GitHub
+# repository at a pinned commit, verified, and placed next to the executable
+# (inside the bundle on macOS). Its license must ship with the app.
+option(MC_BUNDLE_SOUNDFONT "Download and bundle the GeneralUser GS SoundFont" ON)
+if(MC_BUNDLE_SOUNDFONT)
+    set(MC_GU_COMMIT 684543d5e5efaef08d02be50dcda8d552478fa60)
+    set(MC_GU_BASE https://raw.githubusercontent.com/mrbumpy409/GeneralUser-GS/${MC_GU_COMMIT})
+    set(MC_SF2 ${CMAKE_BINARY_DIR}/sounds/GeneralUser-GS.sf2)
+    set(MC_SF2_LICENSE ${CMAKE_BINARY_DIR}/sounds/GeneralUser-GS-LICENSE.txt)
+    if(NOT EXISTS ${MC_SF2})
+        message(STATUS "Downloading GeneralUser GS SoundFont (~31 MB)...")
+        file(DOWNLOAD ${MC_GU_BASE}/GeneralUser-GS.sf2 ${MC_SF2}
+             EXPECTED_HASH SHA256=9575028c7a1f589f5770fccc8cff2734566af40cd26ed836944e9a5152688cfe
+             TLS_VERIFY ON STATUS mc_dl_status)
+        list(GET mc_dl_status 0 mc_dl_code)
+        if(NOT mc_dl_code EQUAL 0)
+            file(REMOVE ${MC_SF2})
+            message(FATAL_ERROR "Could not download GeneralUser GS: ${mc_dl_status}. Configure with -DMC_BUNDLE_SOUNDFONT=OFF to build without built-in sounds.")
+        endif()
+    endif()
+    if(NOT EXISTS ${MC_SF2_LICENSE})
+        file(DOWNLOAD ${MC_GU_BASE}/documentation/LICENSE.txt ${MC_SF2_LICENSE}
+             EXPECTED_HASH SHA256=7b32efefdf95ce38a043799f0659853ddc00fbaa14d8c50f0aca16b9b8b405be TLS_VERIFY ON)
+    endif()
+
+    if(APPLE)
+        set(mc_sound_dest "$<TARGET_BUNDLE_CONTENT_DIR:MidiComposer>/Resources")
+    else()
+        set(mc_sound_dest "$<TARGET_FILE_DIR:MidiComposer>")
+    endif()
+    add_custom_command(TARGET MidiComposer POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E make_directory "${mc_sound_dest}"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different ${MC_SF2} ${MC_SF2_LICENSE} "${mc_sound_dest}"
+        VERBATIM)
+endif()

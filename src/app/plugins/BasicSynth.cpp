@@ -1,4 +1,5 @@
 #include "plugins/BasicSynth.h"
+#include "plugins/SoundFontPlayer.h"
 
 namespace mc::plugins {
 
@@ -76,8 +77,40 @@ PluginInfo InternalPluginHost::basicSynthInfo()
     return {kFormat, kBasicSynthId, "Basic Synth", "MidiComposer", "Synth", {}};
 }
 
+std::vector<PluginInfo> InternalPluginHost::builtins()
+{
+    std::vector<PluginInfo> v{basicSynthInfo()};
+    auto band = soundfont::builtinInstruments();
+    v.insert(v.end(), band.begin(), band.end());
+    return v;
+}
+
+PluginInfo InternalPluginHost::defaultInstrument()
+{
+    for (auto& i : soundfont::builtinInstruments())
+        if (i.identifier == std::string(soundfont::kBuiltinPrefix) + "pop-piano") return i;
+    return basicSynthInfo();
+}
+
+juce::StringArray InternalPluginHost::formats() const { return {kFormat, soundfont::kUserFormat}; }
+
+std::vector<PluginInfo> InternalPluginHost::scan(const std::function<bool(float, const juce::String&)>& progress)
+{
+    auto v = builtins();
+    auto user = soundfont::scanUserFolder(userSounds, progress);
+    v.insert(v.end(), user.begin(), user.end());
+    return v;
+}
+
+bool InternalPluginHost::stillExists(const PluginInfo& i) const
+{
+    if (i.identifier == kBasicSynthId) return true;
+    return soundfont::stillExists(i);
+}
+
 std::unique_ptr<InstrumentPlugin> InternalPluginHost::create(const PluginInfo& info, double sr, int bs, juce::String& error)
 {
+    if (soundfont::isSoundFontInfo(info)) return soundfont::create(info, sr, bs, error);
     if (info.identifier != kBasicSynthId) { error = "Unknown internal instrument"; return nullptr; }
     auto p = std::make_unique<BasicSynth>();
     p->prepare(sr, bs);

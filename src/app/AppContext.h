@@ -38,6 +38,8 @@ public:
     bool exportMidi(const juce::File&, juce::String& error);
     bool exportMusicXml(const juce::File&, juce::String& error);
     bool importMusicXml(const juce::File&, juce::String& error); // .musicxml, .xml, .mxl
+    void openSoundsFolder();   // reveals the user's .sf2 folder in Finder/Explorer
+    void showAbout();          // version + third-party credits
     juce::File currentFile;
     bool hasUnsavedChanges() const { return dirty; }
 

@@ -9,7 +9,7 @@ namespace {
 enum MenuId {
     New = 1, Open, Save, SaveAs, ImportMidi, ImportMusicXml, ExportMidi, ExportMusicXml, Quit,
     Undo = 100, Redo, Cut, Copy, Paste, Delete, SelectAll, AddTrack, DeleteTrack,
-    Settings = 200, Plugins, Rescan
+    Settings = 200, Plugins, Rescan, SoundsFolder, About
 };
 const char* kProjectExt = "*.mcproj";
 }
@@ -129,6 +129,9 @@ juce::PopupMenu MainComponent::getMenuForIndex(int idx, const juce::String&)
         m.addItem(Settings, "Settings (audio, MIDI, modifier keys)...");
         m.addItem(Plugins, "Plugin browser...");
         m.addItem(Rescan, "Rescan plugins");
+        m.addItem(SoundsFolder, "Open Sounds folder (add .sf2 files)...");
+        m.addSeparator();
+        m.addItem(About, "About MIDI Composer...");
     }
     return m;
 }
@@ -161,6 +164,8 @@ void MainComponent::menuItemSelected(int id, int)
             break;
         }
         case Rescan: PluginBrowser::rescanWithProgress(app, {}); break;
+        case SoundsFolder: app.openSoundsFolder(); break;
+        case About: app.showAbout(); break;
         default: break;
     }
 }

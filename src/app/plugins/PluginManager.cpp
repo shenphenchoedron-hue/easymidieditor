@@ -3,6 +3,7 @@
 #include "plugins/BasicSynth.h"
 #include "plugins/ClapPluginHost.h"
 #include "plugins/JucePluginHost.h"
+#include "plugins/SoundFontPlayer.h"
 
 namespace mc::plugins {
 
@@ -10,7 +11,8 @@ PluginManager::PluginManager(juce::File dataDir)
 {
     dataDir.createDirectory();
     cacheFile = dataDir.getChildFile("plugin-cache.json");
-    hosts.push_back(std::make_unique<InternalPluginHost>());
+    userSounds = soundfont::userSoundsFolder(dataDir);
+    hosts.push_back(std::make_unique<InternalPluginHost>(userSounds));
     hosts.push_back(std::make_unique<JucePluginHost>(dataDir.getChildFile("plugin-scan-crashed.txt")));
     hosts.push_back(std::make_unique<ClapPluginHost>());
     loadCache();
@@ -64,7 +66,8 @@ std::unique_ptr<InstrumentPlugin> PluginManager::instantiate(const model::Plugin
 {
     PluginInfo info;
     if (auto* p = find(r)) info = *p;
-    else if (r.format == InternalPluginHost::kFormat) info = InternalPluginHost::basicSynthInfo();
+    else if (r.format == InternalPluginHost::kFormat || r.format == soundfont::kUserFormat)
+        info = {r.format, r.identifier, r.name, r.manufacturer, {}, {}}; // built-ins resolve from the identifier
     else { error = "Plugin not found: " + juce::String(r.name); return nullptr; }
 
     auto* host = hostFor(info.format);
@@ -81,14 +84,19 @@ std::unique_ptr<InstrumentPlugin> PluginManager::instantiate(const model::Plugin
 
 void PluginManager::loadCache()
 {
-    if (!cacheFile.existsAsFile()) { plugins_ = {InternalPluginHost::basicSynthInfo()}; return; }
+    plugins_ = InternalPluginHost::builtins();
+    if (!cacheFile.existsAsFile()) return;
     try {
         auto j = io::Json::parse(cacheFile.loadFileAsString().toStdString());
-        for (auto& e : j["plugins"].arr())
-            plugins_.push_back({e["format"].str(), e["identifier"].str(), e["name"].str(),
-                                e["manufacturer"].str(), e["category"].str(), e["hostData"].str()});
+        for (auto& e : j["plugins"].arr()) {
+            PluginInfo i{e["format"].str(), e["identifier"].str(), e["name"].str(),
+                         e["manufacturer"].str(), e["category"].str(), e["hostData"].str()};
+            // Built-ins always come from the current app version, not from the cache.
+            if (i.format == InternalPluginHost::kFormat) continue;
+            plugins_.push_back(std::move(i));
+        }
     } catch (...) {
-        plugins_ = {InternalPluginHost::basicSynthInfo()}; // corrupt cache: fall back, rescan later
+        plugins_ = InternalPluginHost::builtins(); // corrupt cache: fall back, rescan later
     }
 }
 

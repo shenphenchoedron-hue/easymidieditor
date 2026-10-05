@@ -14,6 +14,11 @@ mkdir -p "$PKG/usr/bin"
 ln -s ../lib/midi-composer/midi-composer "$PKG/usr/bin/midi-composer"
 install -Dm644 "$ROOT/resources/icon.png" "$PKG/usr/share/icons/hicolor/512x512/apps/midi-composer.png"
 install -Dm644 "$ROOT/LICENSE" "$PKG/usr/share/doc/midi-composer/copyright"
+# Built-in instruments (GeneralUser GS SoundFont) + its license
+ART="$(dirname "$BIN")"
+install -Dm644 "$ART/GeneralUser-GS.sf2" "$PKG/usr/share/midi-composer/GeneralUser-GS.sf2"
+install -Dm644 "$ART/GeneralUser-GS-LICENSE.txt" "$PKG/usr/share/midi-composer/GeneralUser-GS-LICENSE.txt"
+install -Dm644 "$ART/GeneralUser-GS-LICENSE.txt" "$PKG/usr/share/doc/midi-composer/GeneralUser-GS-LICENSE.txt"
 
 mkdir -p "$PKG/usr/share/applications"
 cat > "$PKG/usr/share/applications/midi-composer.desktop" <<DESK
@@ -40,7 +45,8 @@ Maintainer: shenphenchoedron-hue <shenphenchoedron-hue@users.noreply.github.com>
 Homepage: https://github.com/shenphenchoedron-hue/easymidieditor
 Description: MIDI composer with scale-based chord input
  Multi-track MIDI editor with piano roll, MIDI keyboard input, recording,
- instrument plugins (VST3/LV2) and diatonic chord input with inversions
+ built-in band instruments (GeneralUser GS), SoundFont (.sf2) and
+ instrument plugins (VST3/LV2), and diatonic chord input with inversions
  and 7th/9th chords.
 CTRL
 

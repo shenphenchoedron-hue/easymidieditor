@@ -27,6 +27,22 @@ The goal is to make MIDI composition feel immediate: open the application, write
 
 **Open → Compose → Export MIDI → Import into DAW.**
 
+## Built-in instruments
+Easy Midi Composer makes sound without any plugins: the most common band
+instruments are built in, grouped as **Rock**, **Pop** and **Jazz** under
+*Internal* in each track's instrument menu (drums, guitars, basses, piano,
+electric piano, organ, ukulele, strings, sax, trumpet, vibraphone).
+
+Want more? Copy SoundFont files (`.sf2`) into the Sounds folder
+(*Options → Open Sounds folder*), then *Options → Rescan plugins*. Every preset
+appears under *SoundFonts*.
+
+Credits: built-in sounds are **GeneralUser GS** by S. Christian Collins
+(https://www.schristiancollins.com/generaluser, license shipped as
+`GeneralUser-GS-LICENSE.txt`). SoundFont playback uses **TinySoundFont** by
+Bernhard Schelling (MIT). The SoundFont is downloaded at configure time
+(`-DMC_BUNDLE_SOUNDFONT=OFF` to skip).
+
 ## Build
 ```
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
