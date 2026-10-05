@@ -1,0 +1,656 @@
+#include "gui/PianoRollComponent.h"
+#include "sequencer/Timing.h"
+#include "theory/ChordEngine.h"
+
+namespace mc::gui {
+
+using model::Note;
+using model::Tick;
+
+namespace {
+constexpr int kKeyboardWidth = 64;
+constexpr int kTimelineHeight = 26;
+constexpr int kVelocityHeight = 64;
+constexpr int kScrollbar = 12;
+
+bool isBlackKey(int p) { const int pc = p % 12; return pc == 1 || pc == 3 || pc == 6 || pc == 8 || pc == 10; }
+
+theory::Scale currentScale(const AppContext& app)
+{
+    return {app.project.harmony.root, theory::ScaleRegistry::instance().byIdOrDefault(app.project.harmony.scaleId)};
+}
+
+const juce::Colour kBg(0xff1e2126), kRowBlack(0xff1a1c20), kRowWhite(0xff24272d), kRowScale(0xff2c3038),
+    kLineGrid(0xff30343b), kLineBeat(0xff3c414a), kLineBar(0xff5a606b), kNote(0xff4fa3e0), kNoteSel(0xffffc04d),
+    kPlayhead(0xffff5555), kLoop(0x2240c0ff), kRec(0xffe05050);
+} // namespace
+
+// ============================================================ Timeline
+class PianoRollComponent::Timeline final : public juce::Component {
+public:
+    explicit Timeline(PianoRollComponent& r) : roll(r) {}
+    void paint(juce::Graphics& g) override
+    {
+        auto& p = roll.app.project;
+        g.fillAll(juce::Colour(0xff2a2d33));
+        const Tick bar = seq::ticksPerBar(p.timeSig), beat = seq::ticksPerBeat(p.timeSig);
+        if (p.loopEnabled || dragLoop) {
+            const auto x1 = (float)roll.tickToX((double)p.loopStart), x2 = (float)roll.tickToX((double)p.loopEnd);
+            g.setColour(juce::Colour(p.loopEnabled ? 0x6640c0ff : 0x33888888));
+            g.fillRect(x1, 0.0f, x2 - x1, (float)getHeight() * 0.4f);
+        }
+        const Tick first = std::max<Tick>(0, (Tick)roll.xToTick(0) / beat * beat);
+        const Tick last = (Tick)roll.xToTick(getWidth()) + beat;
+        g.setFont(12.0f);
+        for (Tick t = first; t <= last; t += beat) {
+            const float x = (float)roll.tickToX((double)t);
+            const bool isBar = t % bar == 0;
+            g.setColour(isBar ? juce::Colours::lightgrey : juce::Colours::grey);
+            g.drawVerticalLine((int)x, isBar ? 0.0f : (float)getHeight() * 0.6f, (float)getHeight());
+            if (isBar && roll.pxPerTick * (double)bar > 28)
+                g.drawText(juce::String(t / bar + 1), (int)x + 3, 2, 40, 14, juce::Justification::left);
+        }
+        const float px = (float)roll.tickToX(roll.app.engine->position());
+        g.setColour(kPlayhead);
+        juce::Path tri;
+        tri.addTriangle(px - 6, (float)getHeight() - 10, px + 6, (float)getHeight() - 10, px, (float)getHeight());
+        g.fillPath(tri);
+    }
+    // Click: set position. Shift/right-drag: define loop range.
+    void mouseDown(const juce::MouseEvent& e) override
+    {
+        dragLoop = e.mods.isShiftDown() || e.mods.isPopupMenu();
+        anchor = roll.snap(roll.xToTick(e.x));
+        if (!dragLoop) roll.app.setPosition(std::max<Tick>(0, (Tick)roll.xToTick(e.x)));
+    }
+    void mouseDrag(const juce::MouseEvent& e) override
+    {
+        const Tick t = roll.snap(roll.xToTick(e.x));
+        if (dragLoop) {
+            if (t != anchor) roll.app.setLoop(true, std::min(anchor, t), std::max(anchor, t));
+        } else roll.app.setPosition(std::max<Tick>(0, (Tick)roll.xToTick(e.x)));
+    }
+    void mouseUp(const juce::MouseEvent&) override { dragLoop = false; }
+    void mouseWheelMove(const juce::MouseEvent& e, const juce::MouseWheelDetails& w) override
+    {
+        roll.zoomHorizontal(w.deltaY > 0 ? 1.15 : 1 / 1.15, e.x);
+    }
+private:
+    PianoRollComponent& roll;
+    bool dragLoop = false;
+    Tick anchor = 0;
+};
+
+// ============================================================ Keyboard
+class PianoRollComponent::Keyboard final : public juce::Component {
+public:
+    explicit Keyboard(PianoRollComponent& r) : roll(r) {}
+    void paint(juce::Graphics& g) override
+    {
+        const auto scale = currentScale(roll.app);
+        const auto disp = roll.app.chordDisplay();
+        const std::set<int> sounding(disp.soundingNotes.begin(), disp.soundingNotes.end());
+        g.fillAll(juce::Colours::white);
+        for (int p = 0; p < 128; ++p) {
+            const float y = (float)roll.pitchToY(p), h = (float)roll.rowHeight;
+            if (y > getHeight() || y + h < 0) continue;
+            const bool black = isBlackKey(p);
+            juce::Colour c = black ? juce::Colour(0xff222222) : juce::Colours::white;
+            if (scale.contains(p)) c = c.interpolatedWith(juce::Colour(0xff6fb7ff), black ? 0.25f : 0.18f);
+            if (sounding.count(p) || p == mousePitch) c = juce::Colour(0xffffa030);
+            g.setColour(c);
+            g.fillRect(0.0f, y, (float)getWidth(), h);
+            g.setColour(juce::Colour(0xff888888));
+            g.drawHorizontalLine((int)(y + h), 0.0f, (float)getWidth());
+            if (p % 12 == 0 || (scale.degreeOf(p) == 0 && h >= 10)) {
+                g.setColour(black ? juce::Colours::white : juce::Colours::black);
+                g.setFont(juce::jmin(12.0f, h));
+                g.drawText(theory::midiNoteName(p), 2, (int)y, getWidth() - 4, (int)h, juce::Justification::centredRight);
+            }
+        }
+        g.setColour(juce::Colours::black);
+        g.drawVerticalLine(getWidth() - 1, 0.0f, (float)getHeight());
+    }
+    void mouseDown(const juce::MouseEvent& e) override { press(roll.yToPitch(e.y)); }
+    void mouseDrag(const juce::MouseEvent& e) override
+    {
+        const int p = roll.yToPitch(e.y);
+        if (p != mousePitch) { release(); press(p); }
+    }
+    void mouseUp(const juce::MouseEvent&) override { release(); }
+    void mouseWheelMove(const juce::MouseEvent& e, const juce::MouseWheelDetails& w) override
+    {
+        if (e.mods.isCommandDown() || e.mods.isAltDown()) roll.zoomVertical(w.deltaY > 0 ? 1.1 : 1 / 1.1, e.y);
+        else roll.scrollBy(0, -w.deltaY * 200);
+    }
+private:
+    void press(int p) { mousePitch = p; roll.app.handleKeyboardNote(true, p, 100); repaint(); }
+    void release() { if (mousePitch >= 0) roll.app.handleKeyboardNote(false, mousePitch, 0); mousePitch = -1; repaint(); }
+    PianoRollComponent& roll;
+    int mousePitch = -1;
+};
+
+// ============================================================ Grid
+class PianoRollComponent::Grid final : public juce::Component {
+public:
+    explicit Grid(PianoRollComponent& r) : roll(r) { setWantsKeyboardFocus(true); }
+
+    void paint(juce::Graphics& g) override
+    {
+        auto& app = roll.app;
+        auto& p = app.project;
+        const auto scale = currentScale(app);
+        g.fillAll(kBg);
+
+        for (int pitch = 0; pitch < 128; ++pitch) {
+            const float y = (float)roll.pitchToY(pitch), h = (float)roll.rowHeight;
+            if (y > getHeight() || y + h < 0) continue;
+            g.setColour(scale.contains(pitch) ? kRowScale : (isBlackKey(pitch) ? kRowBlack : kRowWhite));
+            g.fillRect(0.0f, y, (float)getWidth(), h);
+            g.setColour(pitch % 12 == 0 ? kLineBeat : kLineGrid.withAlpha(0.5f));
+            g.drawHorizontalLine((int)(y + h), 0.0f, (float)getWidth());
+        }
+
+        const Tick bar = seq::ticksPerBar(p.timeSig), beat = seq::ticksPerBeat(p.timeSig);
+        Tick step = roll.gridTicks();
+        while (step * roll.pxPerTick < 6) step *= 2;
+        const Tick first = std::max<Tick>(0, (Tick)roll.xToTick(0) / step * step);
+        for (Tick t = first; roll.tickToX((double)t) < getWidth(); t += step) {
+            g.setColour(t % bar == 0 ? kLineBar : t % beat == 0 ? kLineBeat : kLineGrid);
+            g.drawVerticalLine((int)roll.tickToX((double)t), 0.0f, (float)getHeight());
+        }
+
+        if (p.loopEnabled) {
+            const auto x1 = (float)roll.tickToX((double)p.loopStart), x2 = (float)roll.tickToX((double)p.loopEnd);
+            g.setColour(kLoop);
+            g.fillRect(x1, 0.0f, x2 - x1, (float)getHeight());
+        }
+
+        // other tracks as faint ghost notes
+        for (auto& t : p.tracks())
+            if (auto* mt = dynamic_cast<model::MidiTrack*>(t.get()); mt && mt->id() != p.activeTrack) {
+                g.setColour(juce::Colours::white.withAlpha(0.07f));
+                for (auto& n : mt->notes()) g.fillRect(noteRect(n));
+            }
+
+        if (auto* track = app.activeMidiTrack()) {
+            for (auto& n : track->notes()) {
+                auto r = noteRect(n);
+                if (!r.intersects(getLocalBounds().toFloat())) continue;
+                const bool sel = roll.selection.count(n.id) > 0;
+                auto c = (sel ? kNoteSel : kNote).interpolatedWith(juce::Colours::black, 0.45f * (1.0f - (float)n.velocity / 127.0f));
+                g.setColour(c);
+                g.fillRoundedRectangle(r.reduced(0.5f), 2.0f);
+                g.setColour(sel ? juce::Colours::white : c.darker(0.6f));
+                g.drawRoundedRectangle(r.reduced(0.5f), 2.0f, 1.0f);
+                if (r.getHeight() >= 11 && r.getWidth() > 26) {
+                    g.setColour(juce::Colours::black.withAlpha(0.7f));
+                    g.setFont(juce::jmin(11.0f, r.getHeight() - 1));
+                    g.drawText(theory::midiNoteName(n.pitch), r.reduced(3, 0), juce::Justification::centredLeft, false);
+                }
+            }
+        }
+
+        if (app.isRecording()) {
+            g.setColour(kRec.withAlpha(0.8f));
+            for (auto& n : app.recorder.pending()) g.fillRect(noteRect(n));
+        }
+
+        if (rubber) {
+            g.setColour(juce::Colours::white.withAlpha(0.15f));
+            g.fillRect(*rubber);
+            g.setColour(juce::Colours::white);
+            g.drawRect(*rubber);
+        }
+
+        const float px = (float)roll.tickToX(app.engine->position());
+        g.setColour(app.isRecording() ? kRec : kPlayhead);
+        g.drawLine(px, 0, px, (float)getHeight(), 1.5f);
+
+        if (!app.activeMidiTrack()) {
+            g.setColour(juce::Colours::grey);
+            g.drawText("No MIDI track selected", getLocalBounds(), juce::Justification::centred);
+        }
+    }
+
+    juce::Rectangle<float> noteRect(const Note& n) const
+    {
+        const auto x = (float)roll.tickToX((double)n.start);
+        const auto w = std::max(3.0f, (float)(n.length * roll.pxPerTick));
+        return {x, (float)roll.pitchToY(n.pitch), w, (float)roll.rowHeight};
+    }
+
+    const Note* noteAt(juce::Point<float> pos) const
+    {
+        auto* t = roll.app.activeMidiTrack();
+        if (!t) return nullptr;
+        const Note* hit = nullptr;
+        for (auto& n : t->notes()) if (noteRect(n).contains(pos)) hit = &n; // topmost = last
+        return hit;
+    }
+
+    void mouseDown(const juce::MouseEvent& e) override
+    {
+        grabKeyboardFocus();
+        auto& app = roll.app;
+        auto* track = app.activeMidiTrack();
+        if (!track) return;
+        roll.selectionTrack = track->id();
+        mode = Mode::None;
+        downTick = roll.xToTick(e.x);
+        downPitch = roll.yToPitch(e.y);
+        const Note* hit = noteAt(e.position);
+
+        if (e.mods.isPopupMenu()) { // right click deletes
+            if (hit) {
+                roll.selection.erase(hit->id);
+                app.undo.perform(std::make_unique<model::RemoveNotesCommand>(track->id(), std::vector<model::NoteId>{hit->id}));
+            }
+            return;
+        }
+
+        if (hit) {
+            if (e.mods.isShiftDown()) {
+                if (!roll.selection.erase(hit->id)) roll.selection.insert(hit->id);
+            } else if (!roll.selection.count(hit->id)) {
+                roll.selection = {hit->id};
+            }
+            anchorId = hit->id;
+            mode = (e.position.x > noteRect(*hit).getRight() - 6) ? Mode::Resize : Mode::Move;
+            beginDrag(*track);
+            app.previewNotes({hit->pitch}, hit->velocity, 200);
+            repaint();
+            return;
+        }
+
+        if (e.mods.isCommandDown() || e.mods.isShiftDown()) {
+            mode = Mode::Rubber;
+            if (!e.mods.isShiftDown()) roll.selection.clear();
+            rubberStart = e.position;
+            return;
+        }
+
+        // create: a single note, or a whole diatonic chord in Chord Input Mode
+        const Tick start = roll.app.snapEnabled ? seq::snapFloor((Tick)std::max(0.0, downTick), roll.gridTicks()) : (Tick)std::max(0.0, downTick);
+        std::vector<int> pitches{downPitch};
+        if (app.project.harmony.chordMode)
+            pitches = theory::ChordEngine::build(currentScale(app), app.chordRequestFor(downPitch)).notes;
+        std::vector<Note> notes;
+        for (int p : pitches) notes.push_back({0, p, lastVelocity, start, lastLength, -1});
+        auto cmd = std::make_unique<model::AddNotesCommand>(track->id(), notes, pitches.size() > 1 ? "Insert chord" : "Add note");
+        auto* raw = cmd.get();
+        app.undo.perform(std::move(cmd));
+        roll.selection = std::set<model::NoteId>(raw->addedIds().begin(), raw->addedIds().end());
+        anchorId = raw->addedIds().empty() ? 0 : raw->addedIds().front();
+        app.previewNotes(pitches, lastVelocity, 250);
+        mode = Mode::Resize;
+        beginDrag(*track);
+    }
+
+    void mouseDrag(const juce::MouseEvent& e) override
+    {
+        auto* track = roll.app.activeMidiTrack();
+        if (!track) return;
+        if (mode == Mode::Rubber) {
+            rubber = juce::Rectangle<float>(rubberStart, e.position);
+            std::set<model::NoteId> sel = e.mods.isShiftDown() ? roll.selection : std::set<model::NoteId>{};
+            for (auto& n : track->notes()) if (noteRect(n).intersects(*rubber)) sel.insert(n.id);
+            roll.selection = sel;
+            repaint();
+            return;
+        }
+        if (mode != Mode::Move && mode != Mode::Resize) return;
+        const double dtRaw = roll.xToTick(e.x) - downTick;
+        const Note* anchor = nullptr;
+        for (auto& o : original) if (o.id == anchorId) anchor = &o;
+        if (!anchor && !original.empty()) anchor = &original.front();
+        if (!anchor) return;
+
+        if (mode == Mode::Move) {
+            const Tick newStart = roll.snap((double)anchor->start + dtRaw);
+            const Tick dt = std::max<Tick>(newStart - anchor->start, -minStart);
+            const int dp = juce::jlimit(-minPitch, 127 - maxPitch, roll.yToPitch(e.y) - downPitch);
+            for (auto o : original) { o.start += dt; o.pitch += dp; track->updateNote(o); }
+            if (dp != lastPreviewDp) { lastPreviewDp = dp; roll.app.previewNotes({anchor->pitch + dp}, anchor->velocity, 150); }
+        } else {
+            const Tick newEnd = roll.snap((double)anchor->end() + dtRaw);
+            const Tick dl = newEnd - anchor->end();
+            for (auto o : original) {
+                o.length = std::max<Tick>(roll.app.snapEnabled ? roll.gridTicks() / 4 : 1, o.length + dl);
+                track->updateNote(o);
+            }
+        }
+        changed = true;
+        roll.app.modelChangedWithoutUndo();
+    }
+
+    void mouseUp(const juce::MouseEvent&) override
+    {
+        auto* track = roll.app.activeMidiTrack();
+        rubber.reset();
+        if (track && changed && (mode == Mode::Move || mode == Mode::Resize)) {
+            std::vector<Note> after;
+            for (auto& o : original) if (auto* n = track->findNote(o.id)) after.push_back(*n);
+            for (auto& o : original) track->updateNote(o); // restore, then apply through the undo stack
+            if (auto* a = track->findNote(anchorId)) { lastLength = a->length; }
+            for (auto& n : after) if (n.id == anchorId) lastLength = n.length;
+            roll.app.undo.perform(std::make_unique<model::ModifyNotesCommand>(track->id(), original, after,
+                                                                                mode == Mode::Move ? "Move notes" : "Resize notes"));
+        }
+        mode = Mode::None;
+        changed = false;
+        repaint();
+    }
+
+    void mouseDoubleClick(const juce::MouseEvent&) override {}
+
+    void mouseWheelMove(const juce::MouseEvent& e, const juce::MouseWheelDetails& w) override
+    {
+        if (e.mods.isCommandDown()) roll.zoomHorizontal(w.deltaY > 0 ? 1.15 : 1 / 1.15, e.x);
+        else if (e.mods.isAltDown()) roll.zoomVertical(w.deltaY > 0 ? 1.1 : 1 / 1.1, e.y);
+        else if (e.mods.isShiftDown()) roll.scrollBy(-w.deltaY * 600 / roll.pxPerTick * 0.1, 0);
+        else roll.scrollBy(-w.deltaX * 600 / roll.pxPerTick * 0.1, -w.deltaY * 200);
+    }
+
+    int lastVelocity = 100;
+    Tick lastLength = model::kPPQ / 2;
+
+private:
+    enum class Mode { None, Move, Resize, Rubber };
+    void beginDrag(const model::MidiTrack& t)
+    {
+        original.clear();
+        minStart = std::numeric_limits<Tick>::max();
+        minPitch = 127; maxPitch = 0;
+        for (auto id : roll.selection)
+            if (auto* n = t.findNote(id)) {
+                original.push_back(*n);
+                minStart = std::min(minStart, n->start);
+                minPitch = std::min(minPitch, n->pitch);
+                maxPitch = std::max(maxPitch, n->pitch);
+            }
+        changed = false;
+        lastPreviewDp = 0;
+    }
+
+    PianoRollComponent& roll;
+    Mode mode = Mode::None;
+    double downTick = 0;
+    int downPitch = 60;
+    model::NoteId anchorId = 0;
+    std::vector<Note> original;
+    Tick minStart = 0;
+    int minPitch = 0, maxPitch = 127, lastPreviewDp = 0;
+    bool changed = false;
+    juce::Point<float> rubberStart;
+    std::optional<juce::Rectangle<float>> rubber;
+};
+
+// ============================================================ Velocity lane
+class PianoRollComponent::VelocityLane final : public juce::Component {
+public:
+    explicit VelocityLane(PianoRollComponent& r) : roll(r) {}
+    void paint(juce::Graphics& g) override
+    {
+        g.fillAll(juce::Colour(0xff191b1f));
+        g.setColour(kLineGrid);
+        g.drawHorizontalLine(0, 0, (float)getWidth());
+        auto* t = roll.app.activeMidiTrack();
+        if (!t) return;
+        for (auto& n : t->notes()) {
+            const float x = (float)roll.tickToX((double)n.start);
+            if (x < -4 || x > getWidth()) continue;
+            const float h = (float)(getHeight() - 4) * (float)n.velocity / 127.0f;
+            g.setColour(roll.selection.count(n.id) ? kNoteSel : kNote);
+            g.fillRect(x, (float)getHeight() - h, 3.0f, h);
+            g.fillEllipse(x - 2, (float)getHeight() - h - 3, 7, 7);
+        }
+    }
+    void mouseDown(const juce::MouseEvent& e) override
+    {
+        before.clear();
+        if (auto* t = roll.app.activeMidiTrack()) for (auto& n : t->notes()) before.push_back(n);
+        mouseDrag(e);
+    }
+    void mouseDrag(const juce::MouseEvent& e) override
+    {
+        auto* t = roll.app.activeMidiTrack();
+        if (!t) return;
+        const int vel = juce::jlimit(1, 127, (int)std::round(127.0 * (getHeight() - e.y) / (getHeight() - 4)));
+        const bool onlySel = !roll.selection.empty();
+        bool any = false;
+        for (auto n : t->notes()) {
+            const float x = (float)roll.tickToX((double)n.start);
+            if (std::abs(x - (float)e.x) > 4) continue;
+            if (onlySel && !roll.selection.count(n.id)) continue;
+            n.velocity = vel;
+            t->updateNote(n);
+            any = true;
+        }
+        if (any) roll.app.modelChangedWithoutUndo();
+    }
+    void mouseUp(const juce::MouseEvent&) override
+    {
+        auto* t = roll.app.activeMidiTrack();
+        if (!t) return;
+        std::vector<Note> b, a;
+        for (auto& o : before)
+            if (auto* n = t->findNote(o.id); n && n->velocity != o.velocity) { b.push_back(o); a.push_back(*n); }
+        if (a.empty()) return;
+        for (auto& o : b) t->updateNote(o);
+        roll.app.undo.perform(std::make_unique<model::ModifyNotesCommand>(t->id(), b, a, "Change velocity"));
+    }
+private:
+    PianoRollComponent& roll;
+    std::vector<Note> before;
+};
+
+// ============================================================ PianoRollComponent
+PianoRollComponent::PianoRollComponent(AppContext& a) : app(a)
+{
+    timeline = std::make_unique<Timeline>(*this);
+    keyboard = std::make_unique<Keyboard>(*this);
+    grid = std::make_unique<Grid>(*this);
+    velocity = std::make_unique<VelocityLane>(*this);
+    for (juce::Component* c : {(juce::Component*)timeline.get(), (juce::Component*)keyboard.get(),
+                               (juce::Component*)grid.get(), (juce::Component*)velocity.get()})
+        addAndMakeVisible(c);
+    addAndMakeVisible(hbar);
+    addAndMakeVisible(vbar);
+    hbar.addListener(this);
+    vbar.addListener(this);
+    hbar.setAutoHide(false);
+    vbar.setAutoHide(false);
+    app.addChangeListener(this);
+    setWantsKeyboardFocus(true);
+}
+
+PianoRollComponent::~PianoRollComponent() { app.removeChangeListener(this); }
+
+void PianoRollComponent::paint(juce::Graphics& g)
+{
+    g.fillAll(juce::Colour(0xff2a2d33));
+    g.setColour(juce::Colours::grey);
+    g.setFont(10.0f);
+    g.drawText("Vel", 0, getHeight() - kScrollbar - kVelocityHeight, kKeyboardWidth, 16, juce::Justification::centred);
+}
+
+void PianoRollComponent::resized()
+{
+    auto r = getLocalBounds();
+    auto top = r.removeFromTop(kTimelineHeight);
+    top.removeFromLeft(kKeyboardWidth);
+    timeline->setBounds(top.withTrimmedRight(kScrollbar));
+    auto bottom = r.removeFromBottom(kScrollbar);
+    hbar.setBounds(bottom.withTrimmedLeft(kKeyboardWidth).withTrimmedRight(kScrollbar));
+    auto vel = r.removeFromBottom(kVelocityHeight);
+    velocity->setBounds(vel.withTrimmedLeft(kKeyboardWidth).withTrimmedRight(kScrollbar));
+    vbar.setBounds(r.removeFromRight(kScrollbar));
+    keyboard->setBounds(r.removeFromLeft(kKeyboardWidth));
+    grid->setBounds(r);
+    if (firstLayout && grid->getHeight() > 0) { // centre around C4
+        firstLayout = false;
+        scrollY = juce::jmax(0.0, (127 - 72) * rowHeight - 20);
+    }
+    updateScrollbars();
+}
+
+model::Tick PianoRollComponent::snap(double tick) const
+{
+    tick = std::max(0.0, tick);
+    return app.snapEnabled ? seq::snapNearest((Tick)std::llround(tick), gridTicks()) : (Tick)std::llround(tick);
+}
+
+void PianoRollComponent::zoomHorizontal(double f, double anchorX)
+{
+    const double t = xToTick(anchorX);
+    pxPerTick = juce::jlimit(0.005, 2.0, pxPerTick * f);
+    scrollX = std::max(0.0, t - anchorX / pxPerTick);
+    updateScrollbars();
+    repaint();
+}
+
+void PianoRollComponent::zoomVertical(double f, double anchorY)
+{
+    const double pitchPos = (anchorY + scrollY) / rowHeight;
+    rowHeight = juce::jlimit(5.0, 40.0, rowHeight * f);
+    scrollY = pitchPos * rowHeight - anchorY;
+    updateScrollbars();
+    repaint();
+}
+
+void PianoRollComponent::scrollBy(double dx, double dy)
+{
+    scrollX = std::max(0.0, scrollX + dx);
+    scrollY += dy;
+    updateScrollbars();
+    repaint();
+}
+
+void PianoRollComponent::updateScrollbars()
+{
+    const double totalH = 128 * rowHeight;
+    const double visH = grid->getHeight();
+    scrollY = juce::jlimit(0.0, std::max(0.0, totalH - visH), scrollY);
+    vbar.setRangeLimits(0, totalH, juce::dontSendNotification);
+    vbar.setCurrentRange(scrollY, visH, juce::dontSendNotification);
+
+    Tick len = seq::ticksPerBar(app.project.timeSig) * 64;
+    for (auto& t : app.project.tracks())
+        if (auto* m = dynamic_cast<model::MidiTrack*>(t.get()); m && !m->notes().empty())
+            len = std::max(len, m->notes().back().end() + seq::ticksPerBar(app.project.timeSig) * 16);
+    const double visT = grid->getWidth() / pxPerTick;
+    hbar.setRangeLimits(0, std::max((double)len, scrollX + visT), juce::dontSendNotification);
+    hbar.setCurrentRange(scrollX, visT, juce::dontSendNotification);
+}
+
+void PianoRollComponent::scrollBarMoved(juce::ScrollBar* bar, double start)
+{
+    if (bar == &hbar) scrollX = start; else scrollY = start;
+    repaint();
+}
+
+void PianoRollComponent::changeListenerCallback(juce::ChangeBroadcaster*)
+{
+    if (selectionTrack != app.project.activeTrack) { selection.clear(); selectionTrack = app.project.activeTrack; }
+    if (auto* t = app.activeMidiTrack())
+        for (auto it = selection.begin(); it != selection.end();) it = t->findNote(*it) ? std::next(it) : selection.erase(it);
+    updateScrollbars();
+    repaint();
+}
+
+void PianoRollComponent::refreshPlayhead()
+{
+    const double pos = app.engine->position();
+    if (app.engine->isPlaying()) { // follow playback
+        const double visT = grid->getWidth() / pxPerTick;
+        if (pos > scrollX + visT * 0.95 || pos < scrollX) { scrollX = std::max(0.0, pos - visT * 0.05); updateScrollbars(); grid->repaint(); timeline->repaint(); velocity->repaint(); }
+    }
+    const double x = tickToX(pos);
+    if (x != lastPlayheadX || app.isRecording()) {
+        lastPlayheadX = x;
+        grid->repaint();
+        timeline->repaint();
+    }
+    keyboard->repaint();
+}
+
+// ---------------------------------------------------------------- editing
+void PianoRollComponent::copySelection()
+{
+    auto* t = app.activeMidiTrack();
+    if (!t || selection.empty()) return;
+    app.clipboard.clear();
+    Tick first = std::numeric_limits<Tick>::max();
+    for (auto id : selection) if (auto* n = t->findNote(id)) { app.clipboard.push_back(*n); first = std::min(first, n->start); }
+    for (auto& n : app.clipboard) { n.start -= first; n.id = 0; }
+}
+
+void PianoRollComponent::paste()
+{
+    auto* t = app.activeMidiTrack();
+    if (!t || app.clipboard.empty()) return;
+    const Tick at = snap(app.engine->position());
+    auto notes = app.clipboard;
+    for (auto& n : notes) n.start += at;
+    auto cmd = std::make_unique<model::AddNotesCommand>(t->id(), notes, "Paste");
+    auto* raw = cmd.get();
+    app.undo.perform(std::move(cmd));
+    selection = std::set<model::NoteId>(raw->addedIds().begin(), raw->addedIds().end());
+    selectionTrack = t->id();
+    repaint();
+}
+
+void PianoRollComponent::deleteSelection()
+{
+    auto* t = app.activeMidiTrack();
+    if (!t || selection.empty()) return;
+    app.undo.perform(std::make_unique<model::RemoveNotesCommand>(t->id(), std::vector<model::NoteId>(selection.begin(), selection.end())));
+    selection.clear();
+}
+
+void PianoRollComponent::selectAll()
+{
+    selection.clear();
+    if (auto* t = app.activeMidiTrack()) for (auto& n : t->notes()) selection.insert(n.id);
+    repaint();
+}
+
+bool PianoRollComponent::keyPressed(const juce::KeyPress& k)
+{
+    const bool cmd = k.getModifiers().isCommandDown();
+    if (k == juce::KeyPress::deleteKey || k == juce::KeyPress::backspaceKey) { deleteSelection(); return true; }
+    if (cmd && k.getKeyCode() == 'A') { selectAll(); return true; }
+    if (cmd && k.getKeyCode() == 'C') { copySelection(); return true; }
+    if (cmd && k.getKeyCode() == 'X') { copySelection(); deleteSelection(); return true; }
+    if (cmd && k.getKeyCode() == 'V') { paste(); return true; }
+    if (!cmd && (k.getKeyCode() == juce::KeyPress::upKey || k.getKeyCode() == juce::KeyPress::downKey)) {
+        auto* t = app.activeMidiTrack();
+        if (!t || selection.empty()) return false;
+        const int d = (k.getKeyCode() == juce::KeyPress::upKey ? 1 : -1) * (k.getModifiers().isShiftDown() ? 12 : 1);
+        std::vector<Note> b, a;
+        for (auto id : selection)
+            if (auto* n = t->findNote(id)) {
+                if (n->pitch + d < 0 || n->pitch + d > 127) return true;
+                b.push_back(*n); auto m = *n; m.pitch += d; a.push_back(m);
+            }
+        app.undo.perform(std::make_unique<model::ModifyNotesCommand>(t->id(), b, a, "Transpose"));
+        return true;
+    }
+    if (!cmd && (k.getKeyCode() == juce::KeyPress::leftKey || k.getKeyCode() == juce::KeyPress::rightKey)) {
+        auto* t = app.activeMidiTrack();
+        if (!t || selection.empty()) return false;
+        const Tick d = (k.getKeyCode() == juce::KeyPress::rightKey ? 1 : -1) * gridTicks();
+        std::vector<Note> b, a;
+        for (auto id : selection)
+            if (auto* n = t->findNote(id)) {
+                if (n->start + d < 0) return true;
+                b.push_back(*n); auto m = *n; m.start += d; a.push_back(m);
+            }
+        app.undo.perform(std::make_unique<model::ModifyNotesCommand>(t->id(), b, a, "Nudge"));
+        return true;
+    }
+    return false;
+}
+
+} // namespace mc::gui
