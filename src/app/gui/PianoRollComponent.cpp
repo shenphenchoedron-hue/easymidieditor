@@ -25,6 +25,12 @@ namespace tc = theme::col;
 const juce::Colour kBg = tc::rollBg, kRowBlack = tc::rollRowBlack, kRowWhite = tc::rollRowWhite, kRowScale = tc::rollRowScale,
     kLineGrid = tc::gridSub, kLineBeat = tc::gridBeat, kLineBar = tc::gridBar, kNote = tc::note, kNoteSel = tc::noteSel,
     kPlayhead = tc::playhead, kLoop = tc::loop, kRec = tc::record;
+
+// Notes use the track's colour (set in the track list); default theme colour if none.
+juce::Colour trackNoteColour(const model::Track& t)
+{
+    return t.colour ? juce::Colour(t.colour).withAlpha(1.0f) : kNote;
+}
 } // namespace
 
 // ============================================================ Timeline
@@ -186,19 +192,29 @@ public:
             g.fillRect(x1, 0.0f, x2 - x1, (float)getHeight());
         }
 
-        // other tracks as faint ghost notes
+        // Other tracks shine through in their own colour, like looking through
+        // tracing paper at the layers below. Not clickable.
+        const auto bounds = getLocalBounds().toFloat();
         for (auto& t : p.tracks())
             if (auto* mt = dynamic_cast<model::MidiTrack*>(t.get()); mt && mt->id() != p.activeTrack) {
-                g.setColour(juce::Colour(0xffaeb9c5).withAlpha(0.09f));
-                for (auto& n : mt->notes()) g.fillRoundedRectangle(noteRect(n).reduced(0.5f, 1.0f), 3.0f);
+                const auto ghost = trackNoteColour(*mt);
+                for (auto& n : mt->notes()) {
+                    const auto r = noteRect(n).reduced(0.5f, 1.0f);
+                    if (!r.intersects(bounds)) continue;
+                    g.setColour(ghost.withAlpha(0.22f));
+                    g.fillRoundedRectangle(r, 3.0f);
+                    g.setColour(ghost.withAlpha(0.45f));
+                    g.drawRoundedRectangle(r, 3.0f, 1.0f);
+                }
             }
 
         if (auto* track = app.activeMidiTrack()) {
+            const auto base = trackNoteColour(*track);
             for (auto& n : track->notes()) {
                 auto r = noteRect(n);
-                if (!r.intersects(getLocalBounds().toFloat())) continue;
+                if (!r.intersects(bounds)) continue;
                 const bool sel = roll.selection.count(n.id) > 0;
-                auto c = (sel ? kNoteSel : kNote).interpolatedWith(kBg, 0.45f * (1.0f - (float)n.velocity / 127.0f));
+                auto c = (sel ? kNoteSel : base).interpolatedWith(kBg, 0.45f * (1.0f - (float)n.velocity / 127.0f));
                 const auto nr = r.reduced(0.5f, 1.0f);
                 g.setColour(c);
                 g.fillRoundedRectangle(nr, 3.0f);
@@ -422,7 +438,7 @@ public:
             const float x = (float)roll.tickToX((double)n.start);
             if (x < -4 || x > getWidth()) continue;
             const float h = (float)(getHeight() - 4) * (float)n.velocity / 127.0f;
-            g.setColour((roll.selection.count(n.id) ? kNoteSel : kNote).withAlpha(0.85f));
+            g.setColour((roll.selection.count(n.id) ? kNoteSel : trackNoteColour(*t)).withAlpha(0.85f));
             g.fillRect(x + 1.0f, (float)getHeight() - h, 2.0f, h);
             g.fillEllipse(x - 1.5f, (float)getHeight() - h - 3, 7, 7);
         }
