@@ -40,6 +40,13 @@ void Settings::setAudioDeviceState(const juce::XmlElement* x)
     file().saveIfNeeded();
 }
 
+bool Settings::metronome() const { return file().getBoolValue("metronome", false); }
+void Settings::setMetronome(bool b) { file().setValue("metronome", b); file().saveIfNeeded(); }
+float Settings::metronomeLevel() const { return juce::jlimit(0.0f, 1.0f, (float)file().getDoubleValue("metronomeLevel", 0.6)); }
+void Settings::setMetronomeLevel(float v) { file().setValue("metronomeLevel", (double)v); file().saveIfNeeded(); }
+int Settings::countInBars() const { return juce::jlimit(0, 8, file().getIntValue("countInBars", 1)); }
+void Settings::setCountInBars(int n) { file().setValue("countInBars", n); file().saveIfNeeded(); }
+
 juce::File Settings::lastDirectory() const
 {
     juce::File f(file().getValue("lastDir"));

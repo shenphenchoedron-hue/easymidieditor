@@ -25,6 +25,14 @@ public:
     std::vector<std::uint32_t> colourSwatches() const;
     void setColourSwatches(const std::vector<std::uint32_t>&);
 
+    // Metronome / count-in (per user)
+    bool metronome() const;
+    void setMetronome(bool);
+    float metronomeLevel() const;          // 0..1
+    void setMetronomeLevel(float);
+    int countInBars() const;               // 0 = off
+    void setCountInBars(int);
+
     juce::File lastDirectory() const;
     void setLastDirectory(const juce::File&);
 

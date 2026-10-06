@@ -227,10 +227,10 @@ def content_da():
     table(["Del", "Hvad den gør"], [
         ["Menulinje", "<b>File</b> (projekter, import/eksport), <b>Edit</b> (fortryd, kopiér, spor) og <b>Options</b> "
                       "(indstillinger, plugins, lyde, manual, om programmet). På Mac ligger menuen øverst på skærmen."],
-        ["Transportlinje", "Afspil, stop, optag, loop, tempo, taktart, nodegrid og fortryd."],
+        ["Transportlinje", "Afspil, stop, optag, loop, metronom, count-in, tempo, taktart og fortryd."],
         ["Akkordpanel", "Grundtone, skala, akkordtilstand, modifier-knapper, den aktuelle akkord og forslag til næste akkord."],
         ["Sporliste (venstre)", "Alle spor med navn, farve, mute/solo, lydstyrke, panorering, kanal og instrument."],
-        ["Zoomlinje", "Over piano roll: <b>Zoom</b>-knapperne (kapitel 8)."],
+        ["Editorlinje", "Over piano roll: <b>Zoom</b>-knapperne (kapitel 8), <b>Grid</b> og <b>Snap</b>."],
         ["Piano roll (højre)", "Tonerne på det aktive spor, med tidslinje øverst, klaviatur til venstre og "
                                "velocity-felt (anslagsstyrke) nederst."],
         ["Step sequencere (nederst)", "Alle step sequencer-spor, under piano roll og altid synlige: opsætningskortet "
@@ -245,11 +245,12 @@ def content_da():
         ["<b>Stop</b>", "Stopper. Trykker du <b>Stop</b> igen, mens der er stoppet, hopper linjen til start."],
         ["<b>Rec</b>", "Starter optagelse på det aktive spor (se kapitel 11)."],
         ["<b>Loop</b>", "Slår loop til/fra. Start- og sluttakt sættes i felterne <b>Loop bars</b>."],
+        ["<b>Click</b>", "Metronom til/fra (tasten <b>K</b>). Første slag i hver takt er fremhævet. "
+                         "<b>Højreklik</b> for lydstyrken (Low, Medium, High, Max)."],
+        ["<b>Count-in</b>", "Antal takter med metronom før optagelsen starter: ingen, 1, 2 eller 4 takter."],
         ["Positionsvisning", "Viser takt, slag og tid for afspilningslinjen."],
         ["<b>BPM</b>", "Tempo i slag pr. minut."],
         ["<b>Sig</b>", "Taktart, fx 4/4, 3/4 eller 6/8."],
-        ["<b>Grid</b>", "Nodegrid: 1/4, 1/8, 1/16, 1/32 og trioler (1/8 T, 1/16 T)."],
-        ["<b>Snap</b>", "Når slået til, lægger nye og flyttede toner sig på nodegridet."],
         ["<b>Undo / Redo</b>", "Fortryd og gentag."],
     ], [45, 120])
     h2("Tidslinjen")
@@ -356,6 +357,9 @@ def content_da():
         ["Kopiér / klip / indsæt", "<b>⌘/Ctrl+C</b>, <b>⌘/Ctrl+X</b>, <b>⌘/Ctrl+V</b>. Indsættes ved afspilningslinjen."],
     ], [38, 127])
     p("På en Mac-trackpad svarer højreklik til et klik med to fingre eller Ctrl+klik.")
+    h2("Grid og snap")
+    p("<b>Grid</b> og <b>Snap</b> sidder i linjen over piano roll. Grid: 1/4, 1/8, 1/16, 1/32 og trioler "
+      "(1/8 T, 1/16 T). Når <b>Snap</b> er slået til, lægger nye og flyttede toner sig på nodegridet.")
     h2("Anslagsstyrke (velocity)")
     p("Feltet nederst viser hver tones anslagsstyrke som en lodret streg. Klik og træk hen over stregerne for at ændre den. Er nogle toner markeret, ændres kun de markerede. Bløde "
       "toner vises lidt mørkere i piano roll.")
@@ -472,12 +476,16 @@ def content_da():
     h1("11. Optagelse")
     steps([
         "Vælg det spor, du vil optage på.",
-        "Tryk <b>Rec</b> (eller <b>R</b>). Afspilningen starter, og det, du spiller, vises med rødt.",
+        "Vælg en <b>Count-in</b> (fx 1 takt), og slå <b>Click</b> til, hvis du vil have metronomen med, mens du optager.",
+        "Tryk <b>Rec</b> (eller <b>R</b>). Med count-in tæller metronomen først takterne for – displayet viser "
+        "<b>COUNT-IN</b> og de resterende slag – derefter starter afspilning og optagelse. Det, du spiller, vises med rødt.",
         "Tryk <b>Stop</b> (eller <b>mellemrum</b>). Tonerne lægges ind på sporet i ét trin, som kan fortrydes.",
     ])
     p("Er <b>Loop</b> slået til, kører optagelsen rundt i loopet, og alt, hvad du spiller på de forskellige gennemløb, "
       "kommer med. På den måde kan du bygge lag på lag, fx først bas og så akkorder. Akkordtilstand og modifiers virker også "
       "under optagelse.")
+    tip("Toner, der spilles under count-in, kommer ikke med – undtagen toner spillet lige før første slag. De lægges "
+        "ved starten, så en lidt for tidlig første tone ikke går tabt.")
 
     # ---- 11
     h1("12. Filer, import og eksport")
@@ -516,6 +524,7 @@ def content_da():
         ["Home", "Til start (eller loopets start)"],
         ["R", "Optag til/fra"],
         ["L", "Loop til/fra"],
+        ["K", "Metronom til/fra"],
         ["C", "Akkordtilstand til/fra"],
         ["+ / -", "Zoom ind / ud i tid (piano roll)"],
         ["⌘/Ctrl+Z", "Fortryd"],

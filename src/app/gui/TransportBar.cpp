@@ -6,9 +6,9 @@ namespace mc::gui {
 
 TransportBar::TransportBar(AppContext& a) : app(a)
 {
-    for (juce::Component* c : std::initializer_list<juce::Component*>{&toStart, &playBtn, &stopBtn, &recBtn, &loopBtn, &position, &bpmLabel, &bpm,
-                               &sigLabel, &sigNum, &sigDen, &loopLabel, &loopStartBar, &loopEndBar, &gridLabel, &gridBox,
-                               &snapBtn, &undoBtn, &redoBtn})
+    for (juce::Component* c : std::initializer_list<juce::Component*>{&toStart, &playBtn, &stopBtn, &recBtn, &loopBtn, &clickBtn, &countInBox,
+                               &position, &bpmLabel, &bpm, &sigLabel, &sigNum, &sigDen, &loopLabel, &loopStartBar, &loopEndBar,
+                               &undoBtn, &redoBtn})
         addAndMakeVisible(c);
 
     toStart.onClick = [this] { app.returnToStart(); };
@@ -20,7 +20,19 @@ TransportBar::TransportBar(AppContext& a) : app(a)
     theme::setStyle(stopBtn, theme::styleTransport);
     theme::setStyle(toStart, theme::styleTransport);
     theme::setStyle(loopBtn, theme::styleTransport);
-    for (auto* l : {&bpmLabel, &sigLabel, &loopLabel, &gridLabel}) {
+    // metronome + count-in
+    theme::setStyle(clickBtn, theme::styleWarm);
+    clickBtn.setTooltip("Metronome on/off (K). Right-click for the volume.");
+    clickBtn.onClick = [this] {
+        if (clickBtn.rightClick) showMetronomeMenu();
+        else app.setMetronome(!app.metronome());
+    };
+    countInBox.addItem("No count-in", 1);
+    for (int n : {1, 2, 4}) countInBox.addItem("Count-in " + juce::String(n) + (n == 1 ? " bar" : " bars"), n + 1);
+    countInBox.setTooltip("Bars of metronome count-in before recording starts");
+    countInBox.onChange = [this] { app.setCountInBars(countInBox.getSelectedId() - 1); };
+
+    for (auto* l : {&bpmLabel, &sigLabel, &loopLabel}) {
         l->setFont(theme::uiFont(13.5f, true));
         l->setColour(juce::Label::textColourId, theme::col::textDim);
         l->setJustificationType(juce::Justification::centredRight);
@@ -52,18 +64,6 @@ TransportBar::TransportBar(AppContext& a) : app(a)
     };
     loopStartBar.onValueChange = loopChanged;
     loopEndBar.onValueChange = loopChanged;
-
-    // Grid values; extendable with triplet/dotted variants (GridValue supports them).
-    gridBox.addItem("1/4", 4); gridBox.addItem("1/8", 8); gridBox.addItem("1/16", 16); gridBox.addItem("1/32", 32);
-    gridBox.addItem("1/8 T", 108); gridBox.addItem("1/16 T", 116);
-    gridBox.setSelectedId(16, juce::dontSendNotification);
-    gridBox.onChange = [this] {
-        const int id = gridBox.getSelectedId();
-        app.grid = id > 100 ? seq::GridValue{id - 100, true} : seq::GridValue{id};
-        app.sendChangeMessage();
-    };
-    snapBtn.setToggleState(true, juce::dontSendNotification);
-    snapBtn.onClick = [this] { app.snapEnabled = snapBtn.getToggleState(); };
 
     undoBtn.onClick = [this] { app.undo.undo(); };
     redoBtn.onClick = [this] { app.undo.redo(); };
@@ -98,6 +98,7 @@ void TransportBar::resized()
     auto place = [&](juce::Component& c, int w, int after = gapS) { c.setBounds(r.removeFromLeft(w)); r.removeFromLeft(after); };
     auto group = [&] { r.removeFromLeft(gapS); separators.push_back(r.getX()); r.removeFromLeft(gapGroup - gapS + 2); };
     place(toStart, 36); place(playBtn, 58); place(stopBtn, 58); place(recBtn, 52); place(loopBtn, 54, gap);
+    place(clickBtn, 58); place(countInBox, 132, gap);
     place(position, 136);
     group();
     place(bpmLabel, 32); place(bpm, 96);
@@ -106,13 +107,31 @@ void TransportBar::resized()
     group();
     place(loopLabel, 62); place(loopStartBar, 88); place(loopEndBar, 88);
     group();
-    place(gridLabel, 32); place(gridBox, 78, gap); place(snapBtn, 64);
-    group();
     place(undoBtn, 54); place(redoBtn, 54);
+}
+
+void TransportBar::showMetronomeMenu()
+{
+    juce::PopupMenu m;
+    m.addSectionHeader("Metronome volume");
+    const std::pair<const char*, float> levels[] = {{"Low", 0.25f}, {"Medium", 0.45f}, {"High", 0.7f}, {"Max", 1.0f}};
+    for (int i = 0; i < 4; ++i)
+        m.addItem(i + 1, levels[i].first, true, std::abs(app.metronomeLevel() - levels[i].second) < 0.05f);
+    m.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(&clickBtn), [this, levels](int r) {
+        if (r > 0) app.setMetronomeLevel(levels[r - 1].second);
+    });
 }
 
 void TransportBar::refreshPosition()
 {
+    if (app.isCountingIn()) {
+        const auto beat = (double)seq::ticksPerBeat(app.project.timeSig);
+        const int beatsLeft = (int)std::ceil(app.engine->countInRemaining() / beat);
+        position.setText("COUNT-IN " + juce::String(beatsLeft), juce::dontSendNotification);
+        playBtn.setToggleState(true, juce::dontSendNotification);
+        recBtn.setToggleState(app.isRecording(), juce::dontSendNotification);
+        return;
+    }
     const auto bb = seq::toBarBeat((model::Tick)app.engine->position(), app.project.timeSig);
     position.setText(juce::String::formatted("%3d . %d . %03d", bb.bar, bb.beat, (int)(bb.tick * 1000 / seq::ticksPerBeat(app.project.timeSig))),
                      juce::dontSendNotification);
@@ -129,6 +148,9 @@ void TransportBar::refreshFromModel()
     sigNum.setSelectedId(p.timeSig.numerator, juce::dontSendNotification);
     sigDen.setSelectedId(p.timeSig.denominator, juce::dontSendNotification);
     loopBtn.setToggleState(p.loopEnabled, juce::dontSendNotification);
+    clickBtn.setToggleState(app.metronome(), juce::dontSendNotification);
+    countInBox.setSelectedId(app.countInBars() + 1, juce::dontSendNotification);
+    if (countInBox.getSelectedId() == 0) countInBox.setText("Count-in " + juce::String(app.countInBars()), juce::dontSendNotification);
     const auto bar = seq::ticksPerBar(p.timeSig);
     loopStartBar.setValue((double)(p.loopStart / bar + 1), juce::dontSendNotification);
     loopEndBar.setValue((double)(p.loopEnd / bar + 1), juce::dontSendNotification);

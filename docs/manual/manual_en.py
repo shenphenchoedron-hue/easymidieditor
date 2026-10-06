@@ -98,10 +98,10 @@ def content_en(m):
     table(["Part", "What it does"], [
         ["Menu bar", "<b>File</b> (projects, import/export), <b>Edit</b> (undo, copy, tracks) and <b>Options</b> "
                      "(settings, plugins, sounds, manual, about). On a Mac the menu is at the top of the screen."],
-        ["Transport bar", "Play, stop, record, loop, tempo, time signature, note grid and undo."],
+        ["Transport bar", "Play, stop, record, loop, metronome, count-in, tempo, time signature and undo."],
         ["Chord panel", "Root, scale, chord mode, modifier buttons, the current chord and next-chord suggestions."],
         ["Track list (left)", "All tracks with name, colour, mute/solo, volume, pan, channel and instrument."],
-        ["Zoom bar", "Above the piano roll: the <b>Zoom</b> buttons (chapter 8)."],
+        ["Editor bar", "Above the piano roll: the <b>Zoom</b> buttons (chapter 8), <b>Grid</b> and <b>Snap</b>."],
         ["Piano roll (right)", "The notes of the active track, with the timeline on top, the keyboard on the left and "
                                "the velocity lane at the bottom."],
         ["Step sequencers (bottom)", "Every step sequencer track, below the piano roll and always visible: the setup card "
@@ -116,11 +116,12 @@ def content_en(m):
         ["<b>Stop</b>", "Stops. Press <b>Stop</b> again while stopped to jump back to the start."],
         ["<b>Rec</b>", "Starts recording on the active track (see chapter 11)."],
         ["<b>Loop</b>", "Turns the loop on/off. Start and end bar are set in the <b>Loop bars</b> fields."],
+        ["<b>Click</b>", "Metronome on/off (key <b>K</b>). The first beat of each bar is accented. "
+                         "<b>Right-click</b> for the volume (Low, Medium, High, Max)."],
+        ["<b>Count-in</b>", "Bars of metronome count-in before recording starts: none, 1, 2 or 4 bars."],
         ["Position display", "Shows bar, beat and time of the playhead."],
         ["<b>BPM</b>", "Tempo in beats per minute."],
         ["<b>Sig</b>", "Time signature, e.g. 4/4, 3/4 or 6/8."],
-        ["<b>Grid</b>", "Note grid: 1/4, 1/8, 1/16, 1/32 and triplets (1/8 T, 1/16 T)."],
-        ["<b>Snap</b>", "When on, new and moved notes snap to the grid."],
         ["<b>Undo / Redo</b>", "Undo and redo."],
     ], [45, 120])
     h2("The timeline")
@@ -229,6 +230,9 @@ def content_en(m):
         ["Copy / cut / paste", "<b>⌘/Ctrl+C</b>, <b>⌘/Ctrl+X</b>, <b>⌘/Ctrl+V</b>. Pastes at the playhead."],
     ], [38, 127])
     p("On a Mac trackpad, a right-click is a two-finger click or Ctrl+click.")
+    h2("Grid and snap")
+    p("<b>Grid</b> and <b>Snap</b> are in the bar above the piano roll. Grid: 1/4, 1/8, 1/16, 1/32 and triplets "
+      "(1/8 T, 1/16 T). When <b>Snap</b> is on, new and moved notes snap to the grid.")
     h2("Velocity")
     p("The lane at the bottom shows each note's velocity as a vertical line. Click and drag across the lines to change "
       "it. If some notes are selected, only the selected notes change. Soft notes are drawn slightly darker in the "
@@ -346,12 +350,16 @@ def content_en(m):
     h1("11. Recording")
     steps([
         "Select the track you want to record on.",
-        "Press <b>Rec</b> (or <b>R</b>). Playback starts, and what you play is shown in red.",
+        "Choose a <b>Count-in</b> (e.g. 1 bar) and turn on <b>Click</b> if you want the metronome while you record.",
+        "Press <b>Rec</b> (or <b>R</b>). With a count-in the metronome counts the bars first – the display shows "
+        "<b>COUNT-IN</b> and the beats left – then playback and recording start. What you play is shown in red.",
         "Press <b>Stop</b> (or <b>space</b>). The notes are added to the track in one step, which can be undone.",
     ])
     p("If <b>Loop</b> is on, recording keeps going around the loop, and everything you play on each pass is kept. That "
       "way you can build up layers, e.g. first the bass and then the chords. Chord mode and modifiers also work while "
       "recording.")
+    tip("Notes played during the count-in are ignored, except notes played just before the first beat – they are "
+        "recorded at the start, so a slightly early first note is not lost.")
 
     # ---- 11
     h1("12. Files, import and export")
@@ -391,6 +399,7 @@ def content_en(m):
         ["Home", "To start (or loop start)"],
         ["R", "Record on/off"],
         ["L", "Loop on/off"],
+        ["K", "Metronome on/off"],
         ["C", "Chord mode on/off"],
         ["+ / -", "Zoom in / out in time (piano roll)"],
         ["⌘/Ctrl+Z", "Undo"],

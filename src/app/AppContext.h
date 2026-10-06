@@ -75,6 +75,15 @@ public:
     void setTimeSignature(int num, int den);
     void setLoop(bool enabled, model::Tick start, model::Tick end);
 
+    // ---- metronome / count-in (count-in is used when recording)
+    bool metronome() const { return metronomeOn; }
+    void setMetronome(bool);
+    float metronomeLevel() const { return metronomeLvl; }
+    void setMetronomeLevel(float);
+    int countInBars() const { return countIn; }
+    void setCountInBars(int);
+    bool isCountingIn() const { return engine && engine->isCountingIn(); }
+
     // ---- harmony / chord input
     void setHarmony(int root, const std::string& scaleId, bool chordMode);
     void setModifierLatched(input::Modifier, bool on);
@@ -116,7 +125,10 @@ private:
     std::map<model::TrackId, juce::String> errors;
     std::map<model::TrackId, std::unique_ptr<juce::DocumentWindow>> editorWindows;
     int listenerHandle = 0;
-    model::TrackId lastPianoTrack = 0; // the piano roll never edits step sequencer lines
+    model::TrackId lastPianoTrack = 0;
+    bool metronomeOn = false;
+    float metronomeLvl = 0.6f;
+    int countIn = 1; // the piano roll never edits step sequencer lines
     bool dirty = false;
     bool suppressDirty = false;
 };

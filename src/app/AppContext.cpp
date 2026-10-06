@@ -44,6 +44,11 @@ AppContext::AppContext()
 
     chordInput.setMapping(settings.controllerMapping());
     project.controllerMapping = chordInput.mapping();
+    metronomeOn = settings.metronome();
+    metronomeLvl = settings.metronomeLevel();
+    countIn = settings.countInBars();
+    engine->setMetronome(metronomeOn);
+    engine->setMetronomeLevel(metronomeLvl);
 
     listenerHandle = project.addListener([this] { onModelChanged(); });
     newProject();
@@ -112,6 +117,7 @@ void AppContext::syncEngine()
     activeTrackAtomic = project.activeTrack;
     if (auto* a = activeMidiTrack()) activeChannelAtomic = a->channel;
     engine->setTempo(project.tempoBpm);
+    engine->setMeter(seq::ticksPerBeat(project.timeSig), seq::ticksPerBar(project.timeSig));
     engine->setLoop(project.loopEnabled, project.loopStart, project.loopEnd);
     engine->setSnapshot(std::make_shared<seq::SequenceSnapshot>(seq::SequenceSnapshot::build(project)));
 }
@@ -512,7 +518,33 @@ void AppContext::toggleRecord()
     if (recorder.isRecording()) { stop(); return; }
     if (!activeMidiTrack()) return;
     recorder.start(project.loopStart, project.loopEnd, project.loopEnabled);
-    play();
+    if (countIn > 0 && !engine->isPlaying())
+        engine->playWithCountIn((model::Tick)countIn * seq::ticksPerBar(project.timeSig));
+    else
+        engine->play();
+    sendChangeMessage();
+}
+
+void AppContext::setMetronome(bool on)
+{
+    metronomeOn = on;
+    engine->setMetronome(on);
+    settings.setMetronome(on);
+    sendChangeMessage();
+}
+
+void AppContext::setMetronomeLevel(float v)
+{
+    metronomeLvl = juce::jlimit(0.0f, 1.0f, v);
+    engine->setMetronomeLevel(metronomeLvl);
+    settings.setMetronomeLevel(metronomeLvl);
+}
+
+void AppContext::setCountInBars(int n)
+{
+    countIn = juce::jlimit(0, 8, n);
+    settings.setCountInBars(countIn);
+    sendChangeMessage();
 }
 
 void AppContext::returnToStart() { engine->setPosition(project.loopEnabled ? project.loopStart : 0); sendChangeMessage(); }
@@ -602,7 +634,9 @@ void AppContext::sendLive(const std::vector<input::OutputEvent>& events)
     const auto track = activeTrackAtomic.load();
     const int ch = activeChannelAtomic.load() + 1;
     const auto now = (model::Tick)engine->position();
-    const bool rec = recorder.isRecording();
+    bool rec = recorder.isRecording();
+    // During the count-in only notes played just before the downbeat are recorded (at the start).
+    if (rec && engine->isCountingIn() && engine->countInRemaining() > (double)engine->beatTicks() / 2) rec = false;
     for (auto& e : events) {
         engine->pushLive(track, e.noteOn ? juce::MidiMessage::noteOn(ch, e.pitch, (juce::uint8)e.velocity)
                                          : juce::MidiMessage::noteOff(ch, e.pitch));

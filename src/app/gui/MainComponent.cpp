@@ -20,8 +20,25 @@ MainComponent::MainComponent(AppContext& a)
     for (juce::Component* c : std::initializer_list<juce::Component*>{&transport, &chordPanel, &page})
         addAndMakeVisible(c);
     for (juce::Component* c : std::initializer_list<juce::Component*>{&trackList, &pianoRoll, &stepSeq,
-                                                                      &zoomLabel, &zoomOutH, &zoomInH, &zoomOutV, &zoomInV})
+                                                                      &zoomLabel, &zoomOutH, &zoomInH, &zoomOutV, &zoomInV,
+                                                                      &gridLabel, &gridBox, &snapBtn})
         pageContent.addAndMakeVisible(c);
+    // Note grid + snap for the piano roll (extendable with triplet/dotted variants; GridValue supports them).
+    gridLabel.setFont(theme::uiFont(13.5f, true));
+    gridLabel.setColour(juce::Label::textColourId, theme::col::textDim);
+    gridLabel.setJustificationType(juce::Justification::centredRight);
+    gridBox.addItem("1/4", 4); gridBox.addItem("1/8", 8); gridBox.addItem("1/16", 16); gridBox.addItem("1/32", 32);
+    gridBox.addItem("1/8 T", 108); gridBox.addItem("1/16 T", 116);
+    gridBox.setSelectedId(app.grid.triplet ? app.grid.denominator + 100 : app.grid.denominator, juce::dontSendNotification);
+    gridBox.setTooltip("Note grid of the piano roll");
+    gridBox.onChange = [this] {
+        const int id = gridBox.getSelectedId();
+        app.grid = id > 100 ? seq::GridValue{id - 100, true} : seq::GridValue{id};
+        app.sendChangeMessage();
+    };
+    snapBtn.setToggleState(app.snapEnabled, juce::dontSendNotification);
+    snapBtn.setTooltip("Snap notes to the grid");
+    snapBtn.onClick = [this] { app.snapEnabled = snapBtn.getToggleState(); };
     page.setViewedComponent(&pageContent, false);
     page.setScrollBarsShown(true, false);
     page.setScrollBarThickness(12);
@@ -96,6 +113,12 @@ void MainComponent::resized()
         zoomLabel.setBounds(b.removeFromLeft(48));
         b.removeFromLeft(theme::gapS);
         for (auto* z : {&zoomOutH, &zoomInH, &zoomOutV, &zoomInV}) { z->setBounds(b.removeFromLeft(84)); b.removeFromLeft(theme::gapS); }
+        b.removeFromLeft(theme::gapSection);
+        gridLabel.setBounds(b.removeFromLeft(40));
+        b.removeFromLeft(theme::gapS);
+        gridBox.setBounds(b.removeFromLeft(84));
+        b.removeFromLeft(theme::gap);
+        snapBtn.setBounds(b.removeFromLeft(70));
     }
     pageContent.toolbar = bar;
     pianoRoll.setBounds(top);
@@ -142,6 +165,7 @@ bool MainComponent::keyPressed(const juce::KeyPress& k)
     if (cmd && k.getKeyCode() == 'O') { openDialog(); return true; }
     if (cmd && k.getKeyCode() == 'N') { menuItemSelected(New, 0); return true; }
     if (!cmd && k.getKeyCode() == 'R') { app.toggleRecord(); return true; }
+    if (!cmd && k.getKeyCode() == 'K') { app.setMetronome(!app.metronome()); return true; }
     if (!cmd && k.getKeyCode() == 'L') { app.setLoop(!app.project.loopEnabled, app.project.loopStart, app.project.loopEnd); return true; }
     if (!cmd && k.getKeyCode() == 'C') { auto& h = app.project.harmony; app.setHarmony(h.root, h.scaleId, !h.chordMode); return true; }
     return false;

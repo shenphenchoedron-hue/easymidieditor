@@ -70,6 +70,8 @@ Linux deps: libasound2-dev libfreetype-dev libx11-dev libxrandr-dev libxinerama-
   *+ Line* adds a line; each line has its own instrument and note. Click steps to toggle, Shift-click = accent,
   right-click = clear, drag to paint. Step size, bars and start bar apply to the whole step sequencer; every bar has
   its own steps. Right-click a bar in the strip above the steps to copy, duplicate, clear or delete it.
+- Metronome and count-in: *Click* (or K) turns the metronome on (right-click for the volume); *Count-in* sets
+  0/1/2/4 bars of metronome before recording starts. Grid and Snap are in the bar above the piano roll.
 - Timeline: click = set position, Shift/right-drag = loop range.
 - Keys: Space play/stop, R record, L loop, C chord mode, Home return, Ctrl+Z/Y undo/redo, Ctrl+S/O/N.
 - Default modifier keys: C1=1st inv, D1=2nd inv, C#1=7, D#1=9 (change/MIDI Learn in Options > Settings).

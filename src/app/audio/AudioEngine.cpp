@@ -153,8 +153,10 @@ void AudioEngine::audioDeviceIOCallbackWithContext(const float* const*, int, flo
 void AudioEngine::renderChunk(float* const* out, int numOut, int start, int n)
 {
     // transport commands
+    numPendingClicks = 0;
     if (stopRequested_.exchange(false)) {
         playing_ = false;
+        countInLeft_ = 0;
         for (auto& s : slots) releaseHeld(*s, 0);
     }
     const double seek = pendingSeek_.exchange(-1.0);
@@ -179,10 +181,26 @@ void AudioEngine::renderChunk(float* const* out, int numOut, int start, int n)
         liveFifo.finishedRead(n1 + n2);
     }
 
-    // sequencer
-    if (playing_ && audioSnapshot) {
+    // count-in: metronome only, the song position does not move
+    int seqStart = 0;
+    if (playing_ && countInLeft_.load() > 0) {
         const double tps = seq::ticksPerSample(tempo_.load(), sampleRate_.load());
-        int sampleAt = 0;
+        const double total = countInTotal_.load(), left = countInLeft_.load();
+        const double elapsed = total - left, end = elapsed + n * tps;
+        scheduleClicks(elapsed, std::min(end, total), tps, 0, n, elapsed);
+        if (end >= total) { // count-in ends inside this chunk: the song starts at that sample
+            seqStart = juce::jlimit(0, n, (int)std::ceil(left / tps));
+            countInLeft_ = 0;
+        } else {
+            countInLeft_ = total - end;
+            seqStart = n;
+        }
+    }
+
+    // sequencer
+    if (playing_ && audioSnapshot && seqStart < n) {
+        const double tps = seq::ticksPerSample(tempo_.load(), sampleRate_.load());
+        int sampleAt = seqStart;
         while (sampleAt < n) {
             int len = n - sampleAt;
             double segEnd = pos + len * tps;
@@ -196,6 +214,7 @@ void AudioEngine::renderChunk(float* const* out, int numOut, int start, int n)
             }
             const auto fromT = (model::Tick)std::ceil(pos);
             const auto toT = (model::Tick)std::ceil(segEnd);
+            if (metronomeOn_) scheduleClicks(pos, segEnd, tps, sampleAt, n, pos);
             for (auto& s : slots) {
                 const seq::TrackSequence* ts = nullptr;
                 for (auto& t : audioSnapshot->tracks) if (t.trackId == s->id) { ts = &t; break; }
@@ -236,6 +255,46 @@ void AudioEngine::renderChunk(float* const* out, int numOut, int start, int n)
         const float gl = vol * std::min(1.0f, 1.0f - pan), gr = vol * std::min(1.0f, 1.0f + pan);
         if (numOut > 0 && out[0]) juce::FloatVectorOperations::addWithMultiply(out[0] + start, buf.getReadPointer(0), gl, n);
         if (numOut > 1 && out[1]) juce::FloatVectorOperations::addWithMultiply(out[1] + start, buf.getReadPointer(1), gr, n);
+    }
+    renderClicks(out, numOut, start, n);
+}
+
+// Clicks on every beat in [fromTick, toTick); the bar's first beat is accented.
+// originTick is the tick at sample `sampleAt` of this chunk.
+void AudioEngine::scheduleClicks(double fromTick, double toTick, double tps, int sampleAt, int n, double originTick)
+{
+    const auto beat = (double)beatTicks_.load(), bar = (double)barTicks_.load();
+    for (double t = std::ceil(fromTick / beat) * beat; t < toTick; t += beat) {
+        if (numPendingClicks >= (int)pendingClicks.size()) break;
+        const int off = juce::jlimit(0, n - 1, sampleAt + (int)((t - originTick) / tps));
+        const bool accent = std::fmod(t, bar) < 0.5;
+        pendingClicks[(size_t)numPendingClicks++] = {off, accent};
+    }
+}
+
+void AudioEngine::renderClicks(float* const* out, int numOut, int start, int n)
+{
+    if (numPendingClicks == 0 && clickLeft <= 0) return;
+    const double sr = sampleRate_.load();
+    const float level = metronomeLevel_.load();
+    const int len = (int)(sr * 0.045);              // 45 ms click
+    const double decay = std::exp(-1.0 / (sr * 0.009));
+    int next = 0;
+    for (int i = 0; i < n; ++i) {
+        while (next < numPendingClicks && pendingClicks[(size_t)next].offset == i) {
+            const bool accent = pendingClicks[(size_t)next].accent;
+            clickFreq = accent ? 1760.0 : 1175.0;
+            clickGain = (accent ? 0.75 : 0.5) * level;
+            clickPhase = 0;
+            clickLeft = len;
+            ++next;
+        }
+        if (clickLeft <= 0) continue;
+        const float v = (float)(std::sin(clickPhase) * clickGain);
+        clickPhase += juce::MathConstants<double>::twoPi * clickFreq / sr;
+        clickGain *= decay;
+        --clickLeft;
+        for (int c = 0; c < std::min(numOut, 2); ++c) if (out[c]) out[c][start + i] += v;
     }
 }
 

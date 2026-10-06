@@ -44,7 +44,9 @@ private:
     StepSequencerComponent stepSeq;
     // toolbar above the piano roll: zoom
     juce::TextButton zoomOutH{"Zoom out"}, zoomInH{"Zoom in"}, zoomOutV{"Lower"}, zoomInV{"Taller"};
-    juce::Label zoomLabel{{}, "Zoom"};
+    juce::Label zoomLabel{{}, "Zoom"}, gridLabel{{}, "Grid"};
+    juce::ComboBox gridBox;
+    juce::ToggleButton snapBtn{"Snap"};
     juce::Rectangle<int> toolbarArea;
     // Track list + piano roll + step sequencers form one page that scrolls vertically:
     // step sequencers are placed after the piano roll and never shrink it.
