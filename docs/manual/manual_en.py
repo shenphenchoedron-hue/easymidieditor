@@ -86,7 +86,7 @@ def content_en(m):
         "The first time, the program asks whether to <b>scan for instrument plugins</b>. If you have plugins installed "
         "(e.g. Kontakt), choose <b>Scan</b>. You can always do it later via <b>Options → Rescan plugins</b>.",
         "Open <b>Options → Settings (audio, MIDI, modifier keys)</b> and choose your audio device and MIDI keyboard "
-        "(see chapter 12).",
+        "(see chapter 13).",
         "A new project has one track with <b>Grand Piano</b>. Play your keyboard, or click in the piano roll to add notes.",
     ])
     tip("No sound? Check that the right audio device is selected in Settings, that the track is not muted (M), and "
@@ -94,13 +94,15 @@ def content_en(m):
 
     # ---- 4
     h1("4. The window")
-    p("The window has five parts, from top to bottom:")
+    p("The window has six parts, from top to bottom:")
     table(["Part", "What it does"], [
         ["Menu bar", "<b>File</b> (projects, import/export), <b>Edit</b> (undo, copy, tracks) and <b>Options</b> "
                      "(settings, plugins, sounds, manual, about). On a Mac the menu is at the top of the screen."],
         ["Transport bar", "Play, stop, record, loop, tempo, time signature, note grid and undo."],
         ["Chord panel", "Root, scale, chord mode, modifier buttons, the current chord and next-chord suggestions."],
         ["Track list (left)", "All tracks with name, colour, mute/solo, volume, pan, channel and instrument."],
+        ["View toolbar", "Above the editor: the <b>Step Sequencer</b> button switches between the piano roll and the "
+                         "step sequencer (chapter 9), and the <b>Zoom</b> buttons zoom the piano roll."],
         ["Piano roll (right)", "The notes of the active track, with the timeline on top, the keyboard on the left and "
                                "the velocity lane at the bottom."],
     ], [38, 127])
@@ -111,7 +113,7 @@ def content_en(m):
         ["<b>|&lt;</b> (Return to start)", "Jumps to the start – or to the loop start if loop is on. The piano roll follows."],
         ["<b>Play</b>", "Starts playback from the playhead."],
         ["<b>Stop</b>", "Stops. Press <b>Stop</b> again while stopped to jump back to the start."],
-        ["<b>Rec</b>", "Starts recording on the active track (see chapter 10)."],
+        ["<b>Rec</b>", "Starts recording on the active track (see chapter 11)."],
         ["<b>Loop</b>", "Turns the loop on/off. Start and end bar are set in the <b>Loop bars</b> fields."],
         ["Position display", "Shows bar, beat and time of the playhead."],
         ["<b>BPM</b>", "Tempo in beats per minute."],
@@ -189,7 +191,7 @@ def content_en(m):
         ["F1, G1, A1, B1, C2, D2", "Toms (low → high)", "F2", "Ride bell"],
     ], [28, 54, 28, 55])
     tip("Turn chord mode off on drum tracks – otherwise one key becomes three drums. With the default modifier keys "
-        "C1/D1 (see chapter 9), those keys are exactly the bass drum and snare.")
+        "C1/D1 (see chapter 10), those keys are exactly the bass drum and snare.")
     h2("Your own sounds (SoundFonts)")
     steps([
         "Choose <b>Options → Open Sounds folder</b>. The folder opens in Finder/Explorer.",
@@ -213,7 +215,8 @@ def content_en(m):
         ["Add a note", "<b>Click</b> an empty spot. Keep the button down and drag right to set the length. "
                        "In chord mode a whole chord is inserted."],
         ["Move", "Drag a note. Up/down changes pitch, sideways changes time."],
-        ["Change length", "Drag the note's right edge."],
+        ["Change length", "Drag the note's <b>right edge</b> to change where it ends, or its <b>left edge</b> to change "
+                          "where it starts. Over an edge the mouse pointer changes to a ↔ resize arrow."],
         ["Select", "Click a note. <b>Shift+click</b> adds to/removes from the selection."],
         ["Select several", "<b>⌘/Ctrl+drag</b> or <b>Shift+drag</b> on an empty spot draws a selection box. "
                            "<b>⌘/Ctrl+A</b> selects everything."],
@@ -235,13 +238,51 @@ def content_en(m):
         ["⌘/Ctrl+scroll", "Zoom in/out in time."],
         ["Alt/⌥+scroll", "Zoom vertically (taller/shorter rows)."],
         ["Scroll in the timeline", "Zoom in time."],
+        ["<b>Zoom out / Zoom in</b>", "Toolbar buttons: zoom in time. The <b>+</b> and <b>-</b> keys do the same."],
+        ["<b>Lower / Taller</b>", "Toolbar buttons: smaller or taller note rows. The keyboard follows the rows."],
     ], [45, 120])
     h2("The keyboard")
     p("Click the keys on the left to hear the notes. The notes of the selected scale are highlighted as lighter rows "
       "in the piano roll, so you can easily see which notes fit.")
 
     # ---- 9
-    h1("9. Chord mode")
+    h1("9. Step sequencer")
+    p("The step sequencer is a quick way to build drum beats and other repeating patterns. A step sequencer is "
+      "inserted as a track and is built from <b>lines</b>. Each line plays one note with its own instrument, e.g. "
+      "kick, snare and hi-hat, or a bass note on a bass instrument.")
+    h2("Getting started")
+    steps([
+        "Click <b>Step Sequencer</b> in the toolbar above the editor (or press <b>S</b>). The piano roll is replaced "
+        "by the step sequencer. If the project has none yet, one is inserted with a <b>Kick</b> line on Pop Drums.",
+        "Click <b>+ Line</b> to add more lines. New lines suggest Snare, Closed Hat, Open Hat, Clap and so on, and use "
+        "the same instrument as the line above.",
+        "Click the steps to switch them on. Press <b>Space</b> to play – the current step is outlined in red.",
+    ])
+    p("<b>+ New step sequencer</b> (or <b>Edit → Add step sequencer track</b>) inserts another step sequencer. Choose "
+      "which one to show in the drop-down next to the title. Click <b>Step Sequencer</b> again to return to the piano roll.")
+    h2("A line")
+    table(["Part", "What it does"], [
+        ["Name", "Double-click to rename the line."],
+        ["Instrument button", "Choose the line's instrument – the same menu as in the track list (chapter 7)."],
+        ["Note", "The note the line plays. For drum kits: C1 kick, D1 snare, F♯1 closed hi-hat, A♯1 open hi-hat."],
+        ["<b>M</b>", "Mute the line."],
+        ["<b>X</b>", "Delete the line (can be undone)."],
+        ["Steps", "<b>Click</b> = on/off. <b>Shift+click</b> = accent (louder). <b>Right-click</b> = off. "
+                  "<b>Drag</b> across several steps to switch them all on or off."],
+    ], [38, 127])
+    h2("Settings for the whole step sequencer")
+    table(["Setting", "Effect"], [
+        ["<b>Steps</b>", "Number of steps in the pattern (4–64)."],
+        ["<b>Step</b>", "Length of each step: 1/4, 1/8, 1/16, 1/32 or triplets. 16 steps of 1/16 = one bar in 4/4."],
+        ["<b>Repeat</b>", "How many times the pattern is played."],
+        ["<b>Start bar</b>", "The bar where the step sequencer starts."],
+    ], [38, 127])
+    tip("Every line is also an ordinary track in the track list, with volume, pan, mute/solo and colour. The notes are "
+        "generated from the pattern, so they play, export to MIDI and show in the piano roll like any other notes. "
+        "Edit them in the step sequencer – changes made in the piano roll are replaced the next time the pattern changes.")
+
+    # ---- 10
+    h1("10. Chord mode")
     p("In chord mode, every key – on the MIDI keyboard or in the piano roll – plays a whole chord that fits the "
       "selected scale. Play C in C major and you get a C major chord. Play D and you get D minor, and so on.")
     h2("Turning it on")
@@ -267,7 +308,7 @@ def content_en(m):
         ["2nd inversion", "E2 – G2 – C3"],
     ], [45, 120])
     p("The modifier keys do not make a sound themselves in chord mode. You can choose other keys in Settings "
-      "(chapter 12). The current chord is shown in the chord panel, e.g. <b>Am7 – 1st inversion</b>.")
+      "(chapter 13). The current chord is shown in the chord panel, e.g. <b>Am7 – 1st inversion</b>.")
     h2("Next-chord suggestions")
     p("After you play a chord, the chord panel shows up to four suggestions next to <b>Next</b>. Click a suggestion to "
       "hear it. Hover over it to see why it is suggested. The suggestions follow the circle of fifths within the "
@@ -281,7 +322,7 @@ def content_en(m):
     ], [22, 78, 65])
 
     # ---- 10
-    h1("10. Recording")
+    h1("11. Recording")
     steps([
         "Select the track you want to record on.",
         "Press <b>Rec</b> (or <b>R</b>). Playback starts, and what you play is shown in red.",
@@ -292,7 +333,7 @@ def content_en(m):
       "recording.")
 
     # ---- 11
-    h1("11. Files, import and export")
+    h1("12. Files, import and export")
     table(["Menu", "Function"], [
         ["<b>File → New / Open / Save / Save as</b>", "Projects are saved as <b>.mcproj</b>. Tracks, notes, instruments "
                                                         "with their settings, colours, tempo and loop are included."],
@@ -310,7 +351,7 @@ def content_en(m):
     p("In MuseScore, use <b>File → Export → MusicXML</b> (not the normal .mscz file) to bring the score into MIDI Composer.")
 
     # ---- 12
-    h1("12. Settings")
+    h1("13. Settings")
     p("<b>Options → Settings (audio, MIDI, modifier keys)</b> contains:")
     bullets([
         "<b>Audio device</b>: output, sample rate and <b>buffer size</b>. A small buffer (128–256 samples) gives a short "
@@ -323,13 +364,15 @@ def content_en(m):
     p("<b>Options → User manual</b> opens this manual. <b>Options → About MIDI Composer</b> shows the version and credits.")
 
     # ---- 13
-    h1("13. Keyboard shortcuts")
+    h1("14. Keyboard shortcuts")
     table(["Key", "Function"], [
         ["Space", "Play / stop"],
         ["Home", "To start (or loop start)"],
         ["R", "Record on/off"],
         ["L", "Loop on/off"],
         ["C", "Chord mode on/off"],
+        ["S", "Piano roll / step sequencer"],
+        ["+ / -", "Zoom in / out in time (piano roll)"],
         ["⌘/Ctrl+Z", "Undo"],
         ["⌘/Ctrl+Shift+Z or ⌘/Ctrl+Y", "Redo"],
         ["⌘/Ctrl+N / O / S", "New project / Open / Save"],
@@ -343,7 +386,7 @@ def content_en(m):
     p("⌘ applies on Mac, Ctrl on Windows and Linux.")
 
     # ---- 14
-    h1("14. Troubleshooting")
+    h1("15. Troubleshooting")
     table(["Problem", "Solution"], [
         ["No sound", "Check the audio device in Settings, mute/solo and volume on the track, and that the track has an instrument."],
         ["The sound comes late", "Choose a smaller buffer size in Settings (e.g. 256 or 128 samples)."],
@@ -361,7 +404,7 @@ def content_en(m):
     ], [55, 110])
 
     # ---- 15
-    h1("15. Credits and licenses")
+    h1("16. Credits and licenses")
     bullets([
         "<b>GeneralUser GS</b> – the built-in instruments – by S. Christian Collins. "
         "https://www.schristiancollins.com/generaluser. The license is included as GeneralUser-GS-LICENSE.txt.",

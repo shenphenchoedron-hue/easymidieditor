@@ -37,7 +37,15 @@ try:
     registerFontFamily("Body", normal="Body", bold="Body-Bold", italic="Body", boldItalic="Body-Bold")
     BODY, BOLD, SYM = "Body", "Body-Bold", "Sym"
 except Exception:
-    BODY, BOLD, SYM = "Helvetica", "Helvetica-Bold", "Helvetica"
+    try:  # Linux: Liberation Sans (Arial metrics) + DejaVu Sans for symbols
+        pdfmetrics.registerFont(TTFont("Body", "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf"))
+        pdfmetrics.registerFont(TTFont("Body-Bold", "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf"))
+        pdfmetrics.registerFont(TTFont("Sym", "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"))
+        from reportlab.pdfbase.pdfmetrics import registerFontFamily
+        registerFontFamily("Body", normal="Body", bold="Body-Bold", italic="Body", boldItalic="Body-Bold")
+        BODY, BOLD, SYM = "Body", "Body-Bold", "Sym"
+    except Exception:
+        BODY, BOLD, SYM = "Helvetica", "Helvetica-Bold", "Helvetica"
 
 ACCENT = colors.HexColor("#2a7f9e")
 WARM = colors.HexColor("#6b4a12")
@@ -47,7 +55,7 @@ GRID = colors.HexColor("#c9d3db")
 
 def sym(text):
     """Wrap symbols Arial lacks in the Unicode font."""
-    return re.sub(r"([♯♭→←↑↓⌘⌥⇧])", lambda m: f'<font name="{SYM}">{m.group(1)}</font>', text)
+    return re.sub(r"([♯♭→←↑↓↔⌘⌥⇧])", lambda m: f'<font name="{SYM}">{m.group(1)}</font>', text)
 
 
 st = {
@@ -207,7 +215,7 @@ def content_da():
     steps([
         "Første gang spørger programmet, om det skal <b>scanne efter instrument-plugins</b>. Har du plugins installeret "
         "(fx Kontakt), så vælg <b>Scan</b>. Du kan altid gøre det senere via <b>Options → Rescan plugins</b>.",
-        "Åbn <b>Options → Settings (audio, MIDI, modifier keys)</b> og vælg dit lydkort og dit MIDI-keyboard (se kapitel 12).",
+        "Åbn <b>Options → Settings (audio, MIDI, modifier keys)</b> og vælg dit lydkort og dit MIDI-keyboard (se kapitel 13).",
         "Et nyt projekt har ét spor med <b>Grand Piano</b>. Spil på keyboardet, eller klik i piano roll for at sætte toner ind.",
     ])
     tip("Hører du ingenting? Tjek at det rigtige lydkort er valgt i Settings, at sporet ikke er muted (M), og at "
@@ -215,13 +223,15 @@ def content_da():
 
     # ---- 4
     h1("4. Vinduet")
-    p("Vinduet består af fem dele, oppefra og ned:")
+    p("Vinduet består af seks dele, oppefra og ned:")
     table(["Del", "Hvad den gør"], [
         ["Menulinje", "<b>File</b> (projekter, import/eksport), <b>Edit</b> (fortryd, kopiér, spor) og <b>Options</b> "
                       "(indstillinger, plugins, lyde, manual, om programmet). På Mac ligger menuen øverst på skærmen."],
         ["Transportlinje", "Afspil, stop, optag, loop, tempo, taktart, nodegrid og fortryd."],
         ["Akkordpanel", "Grundtone, skala, akkordtilstand, modifier-knapper, den aktuelle akkord og forslag til næste akkord."],
         ["Sporliste (venstre)", "Alle spor med navn, farve, mute/solo, lydstyrke, panorering, kanal og instrument."],
+        ["Visningslinje", "Over editoren: knappen <b>Step Sequencer</b> skifter mellem piano roll og step sequencer "
+                          "(kapitel 9), og <b>Zoom</b>-knapperne zoomer i piano roll."],
         ["Piano roll (højre)", "Tonerne på det aktive spor, med tidslinje øverst, klaviatur til venstre og "
                                "velocity-felt (anslagsstyrke) nederst."],
     ], [38, 127])
@@ -232,7 +242,7 @@ def content_da():
         ["<b>|&lt;</b> (Return to start)", "Hopper til starten – eller til loopets start, hvis loop er slået til. Nodearket følger med."],
         ["<b>Play</b>", "Starter afspilning fra afspilningslinjen."],
         ["<b>Stop</b>", "Stopper. Trykker du <b>Stop</b> igen, mens der er stoppet, hopper linjen til start."],
-        ["<b>Rec</b>", "Starter optagelse på det aktive spor (se kapitel 10)."],
+        ["<b>Rec</b>", "Starter optagelse på det aktive spor (se kapitel 11)."],
         ["<b>Loop</b>", "Slår loop til/fra. Start- og sluttakt sættes i felterne <b>Loop bars</b>."],
         ["Positionsvisning", "Viser takt, slag og tid for afspilningslinjen."],
         ["<b>BPM</b>", "Tempo i slag pr. minut."],
@@ -308,7 +318,7 @@ def content_da():
         ["F1, G1, A1, B1, C2, D2", "Tam-tams (lav → høj)", "F2", "Ride-klokke"],
     ], [28, 54, 28, 55])
     tip("Akkordtilstand bør være slået fra på trommespor – ellers bliver én tangent til tre trommer. Bruger du "
-        "standard-modifiertasterne C1/D1 (se kapitel 9), rammer de netop stortromme og lilletromme.")
+        "standard-modifiertasterne C1/D1 (se kapitel 10), rammer de netop stortromme og lilletromme.")
     h2("Dine egne lyde (SoundFonts)")
     steps([
         "Vælg <b>Options → Open Sounds folder</b>. Mappen åbner i Finder/Stifinder.",
@@ -332,7 +342,8 @@ def content_da():
         ["Indsæt tone", "<b>Klik</b> på et tomt sted. Træk til højre, mens du holder knappen nede, for at bestemme længden. "
                         "I akkordtilstand indsættes en hel akkord."],
         ["Flyt", "Træk i en tone. Op/ned ændrer tonehøjde, til siden ændrer tid."],
-        ["Ændr længde", "Træk i tonens højre kant."],
+        ["Ændr længde", "Træk i tonens <b>højre kant</b> for at ændre, hvor den slutter, eller i den <b>venstre kant</b> "
+                        "for at ændre, hvor den starter. Over en kant skifter musemarkøren til en ↔ pil."],
         ["Markér", "Klik på en tone. <b>Shift+klik</b> tilføjer/fjerner fra markeringen."],
         ["Markér flere", "<b>⌘/Ctrl+træk</b> eller <b>Shift+træk</b> på et tomt sted tegner en markeringsboks. "
                          "<b>⌘/Ctrl+A</b> markerer alt."],
@@ -353,13 +364,51 @@ def content_da():
         ["⌘/Ctrl+rul", "Zoom ind/ud i tid."],
         ["Alt/⌥+rul", "Zoom lodret (højere/lavere tonerækker)."],
         ["Rul i tidslinjen", "Zoom i tid."],
+        ["<b>Zoom out / Zoom in</b>", "Knapper i visningslinjen: zoom i tid. Tasterne <b>+</b> og <b>-</b> gør det samme."],
+        ["<b>Lower / Taller</b>", "Knapper i visningslinjen: lavere eller højere tonerækker. Klaviaturet følger med."],
     ], [45, 120])
     h2("Klaviaturet")
     p("Klik på tangenterne til venstre for at høre tonerne. Tonerne i den valgte skala er fremhævet som lysere rækker i "
       "piano roll, så du let kan se, hvilke toner der passer.")
 
     # ---- 9
-    h1("9. Akkordtilstand")
+    h1("9. Step sequencer")
+    p("Step sequenceren er en hurtig måde at bygge trommerytmer og andre gentagne mønstre på. En step sequencer "
+      "indsættes som et spor og bygges op af <b>linjer</b>. Hver linje spiller én tone med sit eget instrument, fx "
+      "stortromme, lilletromme og hi-hat, eller en bastone på et basinstrument.")
+    h2("Kom i gang")
+    steps([
+        "Klik <b>Step Sequencer</b> i linjen over editoren (eller tryk <b>S</b>). Piano roll skiftes ud med step "
+        "sequenceren. Har projektet ingen endnu, indsættes en med en <b>Kick</b>-linje på Pop Drums.",
+        "Klik <b>+ Line</b> for at tilføje flere linjer. Nye linjer foreslår Snare, Closed Hat, Open Hat, Clap osv. og "
+        "bruger samme instrument som linjen over.",
+        "Klik på trinnene for at tænde dem. Tryk <b>mellemrum</b> for at afspille – det aktuelle trin har en rød ramme.",
+    ])
+    p("<b>+ New step sequencer</b> (eller <b>Edit → Add step sequencer track</b>) indsætter endnu en step sequencer. "
+      "Vælg hvilken der vises i listen ved siden af titlen. Klik <b>Step Sequencer</b> igen for at komme tilbage til piano roll.")
+    h2("En linje")
+    table(["Del", "Hvad den gør"], [
+        ["Navn", "Dobbeltklik for at omdøbe linjen."],
+        ["Instrumentknap", "Vælg linjens instrument – samme menu som i sporlisten (kapitel 7)."],
+        ["Tone", "Den tone, linjen spiller. For trommesæt: C1 stortromme, D1 lilletromme, F♯1 lukket hi-hat, A♯1 åben hi-hat."],
+        ["<b>M</b>", "Slå linjen fra (mute)."],
+        ["<b>X</b>", "Slet linjen (kan fortrydes)."],
+        ["Trin", "<b>Klik</b> = til/fra. <b>Shift+klik</b> = accent (kraftigere). <b>Højreklik</b> = fra. "
+                 "<b>Træk</b> hen over flere trin for at tænde eller slukke dem alle."],
+    ], [38, 127])
+    h2("Indstillinger for hele step sequenceren")
+    table(["Indstilling", "Virkning"], [
+        ["<b>Steps</b>", "Antal trin i mønsteret (4–64)."],
+        ["<b>Step</b>", "Længden af hvert trin: 1/4, 1/8, 1/16, 1/32 eller trioler. 16 trin à 1/16 = én takt i 4/4."],
+        ["<b>Repeat</b>", "Hvor mange gange mønsteret spilles."],
+        ["<b>Start bar</b>", "Den takt, step sequenceren starter i."],
+    ], [38, 127])
+    tip("Hver linje er også et almindeligt spor i sporlisten med lydstyrke, panorering, mute/solo og farve. Tonerne "
+        "laves ud fra mønsteret, så de afspilles, eksporteres til MIDI og vises i piano roll som alle andre toner. "
+        "Ret dem i step sequenceren – ændringer i piano roll erstattes, næste gang mønsteret ændres.")
+
+    # ---- 10
+    h1("10. Akkordtilstand")
     p("Akkordtilstand gør, at hver tangent – på MIDI-keyboardet eller i piano roll – giver en hel akkord, der passer i den "
       "valgte skala. Spiller du C i C-dur, får du C-dur-akkorden. Spiller du D, får du D-mol, og så videre.")
     h2("Sådan slår du det til")
@@ -384,7 +433,7 @@ def content_da():
         ["1st inversion", "G2 – C3 – E3"],
         ["2nd inversion", "E2 – G2 – C3"],
     ], [45, 120])
-    p("Modifier-tasterne spiller ikke selv lyd i akkordtilstand. Du kan vælge andre tangenter i Settings (kapitel 12). "
+    p("Modifier-tasterne spiller ikke selv lyd i akkordtilstand. Du kan vælge andre tangenter i Settings (kapitel 13). "
       "Den aktuelle akkord vises i akkordpanelet, fx <b>Am7 – 1st inversion</b>.")
     h2("Forslag til næste akkord")
     p("Når du har spillet en akkord, viser akkordpanelet op til fire forslag ved <b>Next</b>. Klik på et forslag for at "
@@ -399,7 +448,7 @@ def content_da():
     ], [22, 78, 65])
 
     # ---- 10
-    h1("10. Optagelse")
+    h1("11. Optagelse")
     steps([
         "Vælg det spor, du vil optage på.",
         "Tryk <b>Rec</b> (eller <b>R</b>). Afspilningen starter, og det, du spiller, vises med rødt.",
@@ -410,7 +459,7 @@ def content_da():
       "under optagelse.")
 
     # ---- 11
-    h1("11. Filer, import og eksport")
+    h1("12. Filer, import og eksport")
     table(["Menu", "Funktion"], [
         ["<b>File → New / Open / Save / Save as</b>", "Projekter gemmes som <b>.mcproj</b>. Spor, toner, instrumenter med "
                                                         "deres indstillinger, farver, tempo og loop kommer med."],
@@ -427,7 +476,7 @@ def content_da():
     p("I MuseScore: brug <b>File → Export → MusicXML</b> (ikke den almindelige .mscz-fil) for at få noderne over i MIDI Composer.")
 
     # ---- 12
-    h1("12. Indstillinger")
+    h1("13. Indstillinger")
     p("<b>Options → Settings</b> indeholder:")
     bullets([
         "<b>Lydkort</b>: udgang, samplerate og <b>bufferstørrelse</b>. En lille buffer (128–256 samples) giver kort "
@@ -440,13 +489,15 @@ def content_da():
       "på GitHub). <b>Options → About MIDI Composer</b> viser version og credits.")
 
     # ---- 13
-    h1("13. Tastaturgenveje")
+    h1("14. Tastaturgenveje")
     table(["Tast", "Funktion"], [
         ["Mellemrum", "Afspil / stop"],
         ["Home", "Til start (eller loopets start)"],
         ["R", "Optag til/fra"],
         ["L", "Loop til/fra"],
         ["C", "Akkordtilstand til/fra"],
+        ["S", "Piano roll / step sequencer"],
+        ["+ / -", "Zoom ind / ud i tid (piano roll)"],
         ["⌘/Ctrl+Z", "Fortryd"],
         ["⌘/Ctrl+Shift+Z eller ⌘/Ctrl+Y", "Gentag"],
         ["⌘/Ctrl+N / O / S", "Nyt projekt / Åbn / Gem"],
@@ -460,7 +511,7 @@ def content_da():
     p("⌘ gælder på Mac, Ctrl på Windows og Linux.")
 
     # ---- 14
-    h1("14. Fejlfinding")
+    h1("15. Fejlfinding")
     table(["Problem", "Løsning"], [
         ["Ingen lyd", "Tjek lydkortet i Settings, mute/solo og lydstyrke på sporet, og at sporet har et instrument."],
         ["Lyden kommer for sent", "Vælg en mindre bufferstørrelse i Settings (fx 256 eller 128 samples)."],
@@ -478,7 +529,7 @@ def content_da():
     ], [55, 110])
 
     # ---- 15
-    h1("15. Credits og licenser")
+    h1("16. Credits og licenser")
     bullets([
         "<b>GeneralUser GS</b> – de indbyggede instrumenter – af S. Christian Collins. "
         "https://www.schristiancollins.com/generaluser. Licensen følger med som GeneralUser-GS-LICENSE.txt.",
