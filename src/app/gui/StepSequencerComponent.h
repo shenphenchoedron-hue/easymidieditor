@@ -20,7 +20,8 @@ public:
     void paint(juce::Graphics&) override;
 
     int preferredHeight() const;          // 0 when there is no step sequencer
-    int firstBlockHeight() const;         // height of the first step sequencer (kept visible below the piano roll)
+    int firstBlockHeight() const;
+    static constexpr int kPeekHeight = 184;  // visible below the piano roll: card header + 3 lines         // height of the first step sequencer (kept visible below the piano roll)
     void refreshPlayhead();               // UI timer
     void viewChanged();                   // piano roll scrolled/zoomed
     std::function<void()> onHeightChanged;

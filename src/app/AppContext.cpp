@@ -371,6 +371,7 @@ void AppContext::addStepLine(std::uint64_t group)
     if (!existing.empty()) {
         const auto& f = existing.front()->step;
         pat.stepTicks = f.stepTicks; pat.barTicks = f.barTicks; pat.bars = f.bars; pat.startTick = f.startTick;
+        pat.title = f.title;
     } else {
         pat.barTicks = seq::ticksPerBar(project.timeSig);
         pat.bars = 1;

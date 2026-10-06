@@ -113,6 +113,7 @@ TEST(step_sequencer_bars_are_independent_and_roundtrip)
     CHECK_EQ(t.step.totalSteps(), 32);
     t.step.steps[0] = 100; t.step.steps[4] = 90;   // bar 1
     t.step.steps[16 + 8] = 110;                    // bar 2: different
+    t.step.title = "Drums \"verse\"";
     t.regenerateStepNotes();
     CHECK_EQ(t.notes().size(), (size_t)3);
     CHECK_EQ(t.notes()[2].start, (Tick)((16 + 8) * kPPQ / 4));

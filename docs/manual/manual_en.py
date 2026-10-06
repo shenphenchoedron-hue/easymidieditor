@@ -268,6 +268,7 @@ def content_en(m):
     h2("The card")
     p("The setup of each step sequencer is on its card in the left column:")
     table(["Setting", "Effect"], [
+        ["Title", "Double-click to rename the step sequencer, e.g. <b>Drums verse</b>."],
         ["<b>▾ / ▸</b>", "Collapses the step sequencer to its top row (or expands it again)."],
         ["Colour dot", "Click to choose the colour of the step sequencer – handy when you have several."],
         ["<b>+ Line</b>", "Adds a line."],

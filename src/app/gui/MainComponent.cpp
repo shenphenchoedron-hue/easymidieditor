@@ -76,16 +76,17 @@ void MainComponent::resized()
     page.setBounds(r);
     const int viewH = r.getHeight();
     const int stepsH = stepSeq.preferredHeight();
-    // The piano roll keeps its height; only the first step sequencer peeks in below it.
-    const int peek = stepsH > 0 ? std::min(stepSeq.firstBlockHeight(), (int)(viewH * 0.35)) + 1 : 0;
+    // The piano roll height never depends on the step sequencers' content: a fixed strip below it shows
+    // the start of the step sequencers, and new lines / step sequencers are added further down (scroll to them).
+    const int peek = stepsH > 0 ? std::min(StepSequencerComponent::kPeekHeight, (int)(viewH * 0.3)) + 1 : 0;
     const int topH = std::max(260, viewH - peek);
-    const int totalH = topH + (stepsH > 0 ? 1 + stepsH : 0);
+    const int totalH = std::max(topH + (stepsH > 0 ? 1 + stepsH : 0), topH + peek);
     const int w = totalH > viewH ? r.getWidth() - page.getScrollBarThickness() : r.getWidth();
     pageContent.setSize(w, totalH);
 
     auto top = juce::Rectangle<int>(0, 0, w, topH);
     stepSeq.cardWidth = 290 + 1;
-    stepSeq.setBounds(stepsH > 0 ? juce::Rectangle<int>(0, topH + 1, w, stepsH) : juce::Rectangle<int>());
+    stepSeq.setBounds(stepsH > 0 ? juce::Rectangle<int>(0, topH + 1, w, totalH - topH - 1) : juce::Rectangle<int>());
     trackList.setBounds(top.removeFromLeft(290));
     top.removeFromLeft(1);
     auto bar = top.removeFromTop(34);

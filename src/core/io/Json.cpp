@@ -1,5 +1,7 @@
 #include "io/Json.h"
-#include <charconv>
+#include <locale>
+#include <sstream>
+#include <cctype>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -106,13 +108,17 @@ struct Parser {
         if (lit("true")) return true;
         if (lit("false")) return false;
         if (lit("null")) return nullptr;
-        // from_chars ignores the C locale (strtod would expect "0,5" in e.g. Danish).
-        const char* b = s.data() + i;
-        if (*b == '+') ++b;
+        // Parse with the classic "C" locale: strtod would expect "0,5" in e.g. Danish.
+        // (std::from_chars for double is not available on older macOS.)
+        size_t j = i;
+        while (j < s.size() && (std::isdigit((unsigned char)s[j]) || s[j] == '-' || s[j] == '+' || s[j] == '.' || s[j] == 'e' || s[j] == 'E')) ++j;
+        if (j == i) fail("bad value");
+        std::istringstream in(s.substr(i, j - i));
+        in.imbue(std::locale::classic());
         double d = 0;
-        const auto [end, ec] = std::from_chars(b, s.data() + s.size(), d);
-        if (ec != std::errc() || end == b) fail("bad value");
-        i = (size_t)(end - s.data());
+        in >> d;
+        if (in.fail()) fail("bad value");
+        i = j;
         return d;
     }
 };
@@ -149,9 +155,11 @@ void Json::dumpImpl(std::string& out, int indent, int level) const
     else if (auto* d = std::get_if<double>(&v_)) {
         if (std::isfinite(*d) && *d == std::floor(*d) && std::fabs(*d) < 9e15) out += std::to_string((long long)*d);
         else { // locale independent, always '.' as decimal separator
-            char b[32];
-            const auto r = std::to_chars(b, b + sizeof b, std::isfinite(*d) ? *d : 0.0);
-            out.append(b, r.ptr);
+            std::ostringstream o;
+            o.imbue(std::locale::classic());
+            o.precision(17);
+            o << (std::isfinite(*d) ? *d : 0.0);
+            out += o.str();
         }
     }
     else if (auto* s = std::get_if<std::string>(&v_)) escape(out, *s);

@@ -56,6 +56,7 @@ struct StepPattern {
     int bars = 1;                    // length; every bar has its own steps (no repetition)
     Tick startTick = 0;
     std::vector<std::uint8_t> steps; // velocity per step, 0 = off, size == totalSteps()
+    std::string title;               // step sequencer title (same on all lines), empty = default
 
     Tick lengthTicks() const { return (Tick)bars * barTicks; }
     int totalSteps() const { return (int)((lengthTicks() + stepTicks - 1) / stepTicks); }

@@ -52,7 +52,8 @@ std::string ProjectSerializer::toString(const Project& p)
                 jt.set("stepGroup", (long long)m->stepGroup);
                 jt.set("step", Json::Object{{"pitch", m->step.pitch}, {"stepTicks", (long long)m->step.stepTicks},
                                             {"barTicks", (long long)m->step.barTicks}, {"bars", m->step.bars},
-                                            {"start", (long long)m->step.startTick}, {"steps", steps}});
+                                            {"start", (long long)m->step.startTick}, {"steps", steps},
+                                            {"title", m->step.title}});
             }
         } else {
             jt.set("type", "audio");
@@ -124,6 +125,7 @@ LoadResult ProjectSerializer::fromString(const std::string& text, Project& out)
                 m->step.pitch = (int)js["pitch"].num(36);
                 m->step.stepTicks = std::max<Tick>(1, tick(js["stepTicks"], ppq / 4));
                 m->step.startTick = tick(js["start"], 0);
+                m->step.title = js["title"].str();
                 std::vector<std::uint8_t> steps;
                 for (auto& v : js["steps"].arr()) steps.push_back((std::uint8_t)std::clamp((int)v.num(0), 0, 127));
                 const Tick bar = (Tick)p.timeSig.numerator * kPPQ * 4 / std::max(1, p.timeSig.denominator);

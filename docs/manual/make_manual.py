@@ -394,6 +394,7 @@ def content_da():
     h2("Kortet")
     p("Opsætningen af hver step sequencer sidder på dens kort i venstre kolonne:")
     table(["Indstilling", "Virkning"], [
+        ["Titel", "Dobbeltklik for at omdøbe step sequenceren, fx <b>Trommer vers</b>."],
         ["<b>▾ / ▸</b>", "Klapper step sequenceren sammen til den øverste række (eller folder den ud igen)."],
         ["Farveprik", "Klik for at vælge step sequencerens farve – praktisk, når du har flere."],
         ["<b>+ Line</b>", "Tilføjer en linje."],

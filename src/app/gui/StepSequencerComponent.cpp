@@ -243,6 +243,12 @@ public:
             addAndMakeVisible(c);
         title.setFont(theme::uiFont(14.0f, true));
         title.setColour(juce::Label::textColourId, tc::text);
+        title.setEditable(false, true);
+        title.setTooltip("Double-click to rename this step sequencer");
+        title.onTextChange = [this] {
+            const auto t = title.getText().trim().toStdString();
+            changeAll([t](model::StepPattern& p) { p.title = t; }, "Rename step sequencer");
+        };
         for (auto* l : {&barsLabel, &sizeLabel, &startLabel}) {
             l->setFont(theme::uiFont(13.0f, true));
             l->setColour(juce::Label::textColourId, tc::textDim);
@@ -323,7 +329,9 @@ public:
         colourBtn.colour = colour;
         colourBtn.repaint();
         applyCollapsed();
-        title.setText("Step sequencer " + juce::String((juce::int64)group), juce::dontSendNotification);
+        if (!title.isBeingEdited())
+            title.setText(p.title.empty() ? "Step sequencer " + juce::String((juce::int64)group) : juce::String(p.title),
+                          juce::dontSendNotification);
         sizeBox.setSelectedId((int)(model::kPPQ * 4 / std::max<model::Tick>(1, p.stepTicks)), juce::dontSendNotification);
         barsBox.setValue(p.bars, juce::dontSendNotification);
         startBar.setValue((double)(p.startTick / seq::ticksPerBar(app.project.timeSig) + 1), juce::dontSendNotification);
