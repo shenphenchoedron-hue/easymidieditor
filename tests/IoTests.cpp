@@ -2,6 +2,7 @@
 #include "io/Json.h"
 #include "io/MidiFile.h"
 #include "io/ProjectSerializer.h"
+#include "model/Commands.h"
 
 using namespace mc;
 using namespace mc::model;
@@ -98,4 +99,35 @@ TEST(midi_file_rejects_garbage)
 {
     Project q;
     CHECK(!io::MidiFile::read({1, 2, 3}, q).ok);
+}
+
+TEST(step_sequencer_pattern_generates_notes_and_roundtrips)
+{
+    Project p;
+    auto& t = p.addMidiTrack("Kick");
+    t.stepGroup = 1;
+    t.step.pitch = 36;
+    t.step.numSteps = 8;
+    t.step.repeats = 2;
+    t.step.steps = {100, 0, 0, 0, 90, 0, 0, 0};
+    t.regenerateStepNotes();
+    CHECK_EQ(t.notes().size(), (size_t)4);
+    CHECK_EQ(t.notes()[1].start, (Tick)(4 * kPPQ / 4));
+    CHECK_EQ(t.notes()[2].start, (Tick)(8 * kPPQ / 4));
+    CHECK_EQ(t.notes()[1].velocity, 90);
+
+    Project q;
+    CHECK(io::ProjectSerializer::fromString(io::ProjectSerializer::toString(p), q).ok);
+    auto* l = q.midiTrack(t.id());
+    CHECK(l && l->isStepLine());
+    if (l) { CHECK(l->step == t.step); CHECK_EQ(l->notes().size(), (size_t)4); }
+
+    UndoStack undo(p);
+    auto after = t.step;
+    after.steps[2] = 127;
+    undo.perform(std::make_unique<SetStepPatternsCommand>(std::vector<SetStepPatternsCommand::Entry>{{t.id(), t.step}},
+                                                          std::vector<SetStepPatternsCommand::Entry>{{t.id(), after}}));
+    CHECK_EQ(p.midiTrack(t.id())->notes().size(), (size_t)6);
+    undo.undo();
+    CHECK_EQ(p.midiTrack(t.id())->notes().size(), (size_t)4);
 }

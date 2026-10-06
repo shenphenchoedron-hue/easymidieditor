@@ -129,9 +129,9 @@ void LookAndFeel::drawButtonBackground(juce::Graphics& g, juce::Button& b, const
 
 juce::Font LookAndFeel::getTextButtonFont(juce::TextButton& b, int h)
 {
-    const auto style = b.getProperties()[styleKey].toString();
-    const bool strong = style == stylePlay || style == styleRecord || style == styleTransport;
-    return uiFont(juce::jmin(14.0f, (float)h * 0.55f), strong);
+    // Bold and fairly large so labels stay readable on small screens.
+    juce::ignoreUnused(b);
+    return uiFont(juce::jmin(16.0f, (float)h * 0.68f), true);
 }
 
 void LookAndFeel::drawButtonText(juce::Graphics& g, juce::TextButton& b, bool, bool)
@@ -153,7 +153,7 @@ void LookAndFeel::drawButtonText(juce::Graphics& g, juce::TextButton& b, bool, b
         g.drawFittedText(b.getButtonText(), b.getLocalBounds().reduced(8, 2).withTrimmedRight(16), juce::Justification::centredLeft, 1, 0.9f);
         return;
     }
-    g.drawFittedText(b.getButtonText(), b.getLocalBounds().reduced(6, 2), juce::Justification::centred, 1, 0.8f);
+    g.drawFittedText(b.getButtonText(), b.getLocalBounds().reduced(3, 1), juce::Justification::centred, 1, 0.75f);
 }
 
 // ------------------------------------------------------------------ combo
@@ -177,7 +177,7 @@ void LookAndFeel::drawComboBox(juce::Graphics& g, int w, int h, bool, int, int, 
     g.strokePath(p, juce::PathStrokeType(1.5f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
 }
 
-juce::Font LookAndFeel::getComboBoxFont(juce::ComboBox& b) { return uiFont(juce::jmin(14.0f, (float)b.getHeight() * 0.58f)); }
+juce::Font LookAndFeel::getComboBoxFont(juce::ComboBox& b) { return uiFont(juce::jmin(15.0f, (float)b.getHeight() * 0.66f), true); }
 
 void LookAndFeel::positionComboBoxText(juce::ComboBox& box, juce::Label& label)
 {
@@ -186,6 +186,16 @@ void LookAndFeel::positionComboBoxText(juce::ComboBox& box, juce::Label& label)
 }
 
 // ------------------------------------------------------------------ toggle
+void LookAndFeel::drawToggleButton(juce::Graphics& g, juce::ToggleButton& b, bool hi, bool down)
+{
+    const float tick = 18.0f;
+    drawTickBox(g, b, 2.0f, ((float)b.getHeight() - tick) * 0.5f, tick, tick, b.getToggleState(), b.isEnabled(), hi, down);
+    g.setColour(b.findColour(juce::ToggleButton::textColourId).withMultipliedAlpha(b.isEnabled() ? 1.0f : 0.5f));
+    g.setFont(uiFont(juce::jmin(15.0f, (float)b.getHeight() * 0.68f), true));
+    g.drawFittedText(b.getButtonText(), b.getLocalBounds().withTrimmedLeft((int)tick + 6).withTrimmedRight(2),
+                     juce::Justification::centredLeft, 1, 0.8f);
+}
+
 void LookAndFeel::drawTickBox(juce::Graphics& g, juce::Component&, float x, float y, float w, float h, bool ticked,
                               bool enabled, bool hi, bool)
 {
@@ -239,7 +249,7 @@ void LookAndFeel::drawLinearSlider(juce::Graphics& g, int x, int y, int w, int h
 juce::Label* LookAndFeel::createSliderTextBox(juce::Slider& s)
 {
     auto* l = LookAndFeel_V4::createSliderTextBox(s);
-    l->setFont(uiFont(13.0f));
+    l->setFont(uiFont(14.0f, true));
     l->setColour(juce::Label::outlineColourId, col::border);
     l->setColour(juce::Label::backgroundColourId, col::field);
     l->setColour(juce::Label::textColourId, col::text);

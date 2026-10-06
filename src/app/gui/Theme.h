@@ -82,6 +82,7 @@ public:
     juce::Font getComboBoxFont(juce::ComboBox&) override;
     void positionComboBoxText(juce::ComboBox&, juce::Label&) override;
 
+    void drawToggleButton(juce::Graphics&, juce::ToggleButton&, bool highlighted, bool down) override;
     void drawTickBox(juce::Graphics&, juce::Component&, float x, float y, float w, float h, bool ticked, bool enabled,
                      bool highlighted, bool down) override;
 

@@ -50,6 +50,13 @@ public:
     void selectTrack(model::TrackId);
     model::MidiTrack* activeMidiTrack() const { return project.midiTrack(project.activeTrack); }
     void setTrackPlugin(model::TrackId, const plugins::PluginInfo*); // nullptr = remove
+
+    // ---- step sequencer (a group of MidiTracks, one per line)
+    void addStepSequencer();                       // new group with one line, becomes active
+    void addStepLine(std::uint64_t group);         // new line (track) in an existing group
+    std::uint64_t activeStepGroup() const;         // group of the active track, 0 if none
+    std::vector<model::MidiTrack*> stepLines(std::uint64_t group) const;
+    void setStepPatterns(std::vector<model::SetStepPatternsCommand::Entry> after, const std::string& name = "Edit steps");
     void setTrackBypass(model::TrackId, bool);
     void openPluginEditor(model::TrackId);
     bool isPluginMissing(model::TrackId id) const { return missing.count(id) > 0; }

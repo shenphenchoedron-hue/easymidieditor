@@ -60,8 +60,14 @@ Linux deps: libasound2-dev libfreetype-dev libx11-dev libxrandr-dev libxinerama-
 - `tests` – unit tests.
 
 ## Usage
-- Piano roll: click = add note (or chord in Chord Mode), drag = move, drag right edge = resize, right-click = delete,
-  Ctrl/Shift-drag = rubber band, Del, Ctrl+A/C/X/V, arrows transpose/nudge, Ctrl+wheel zoom H, Alt+wheel zoom V.
+- Piano roll: click = add note (or chord in Chord Mode), drag = move, drag left or right edge = resize (the cursor
+  changes to a resize arrow over an edge), right-click = delete, Ctrl/Shift-drag = rubber band, Del, Ctrl+A/C/X/V,
+  arrows transpose/nudge. Zoom: toolbar buttons *Zoom out/in* (time) and *Lower/Taller* (rows + keyboard),
+  `+`/`-` keys, Ctrl+wheel (time), Alt+wheel (height).
+- Step sequencer: click *Step Sequencer* above the editor (or press S) to switch mode. *+ New step sequencer*
+  inserts a step sequencer as a track; *+ Line* adds a line. Each line is its own track with its own instrument
+  (instrument button) and note. Click steps to toggle, Shift-click = accent, right-click = clear, drag to paint.
+  Steps, step size, repeats and start bar apply to the whole step sequencer.
 - Timeline: click = set position, Shift/right-drag = loop range.
 - Keys: Space play/stop, R record, L loop, C chord mode, Home return, Ctrl+Z/Y undo/redo, Ctrl+S/O/N.
 - Default modifier keys: C1=1st inv, D1=2nd inv, C#1=7, D#1=9 (change/MIDI Learn in Options > Settings).

@@ -45,6 +45,22 @@ struct PluginReference {
     bool empty() const { return identifier.empty(); }
 };
 
+// Step sequencer line. A step sequencer is a group of MidiTracks sharing the
+// same stepGroup id; every track is one line with its own instrument. The
+// line's notes are generated from the pattern, so playback, MIDI export and
+// the piano roll see ordinary notes.
+struct StepPattern {
+    int pitch = 36;                  // note played by this line
+    int numSteps = 16;               // steps per pattern
+    Tick stepTicks = kPPQ / 4;       // 1/16 by default
+    int repeats = 4;                 // pattern is repeated this many times
+    Tick startTick = 0;
+    std::vector<std::uint8_t> steps; // velocity per step, 0 = off (size == numSteps)
+
+    void normalise();                // clamps values and resizes steps
+    bool operator==(const StepPattern&) const = default;
+};
+
 class MidiTrack final : public Track {
 public:
     using Track::Track;
@@ -53,6 +69,11 @@ public:
 
     int channel = 0; // 0..15
     PluginReference plugin;
+
+    std::uint64_t stepGroup = 0;     // != 0: this track is a line of a step sequencer
+    StepPattern step;
+    bool isStepLine() const { return stepGroup != 0; }
+    void regenerateStepNotes();      // replaces all notes with the pattern
 
     const std::vector<Note>& notes() const { return notes_; }
     NoteId addNote(Note n);                 // assigns id if 0; keeps notes sorted by start

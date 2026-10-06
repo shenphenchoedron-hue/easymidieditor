@@ -2,6 +2,7 @@
 #include "AppContext.h"
 #include "gui/ChordPanel.h"
 #include "gui/PianoRollComponent.h"
+#include "gui/StepSequencerComponent.h"
 #include "gui/TrackListComponent.h"
 #include "gui/TransportBar.h"
 
@@ -40,6 +41,12 @@ private:
     ChordPanel chordPanel;
     TrackListComponent trackList;
     PianoRollComponent pianoRoll;
+    StepSequencerComponent stepSeq;
+    // view toolbar above the editor: Piano roll / Step sequencer mode + zoom
+    juce::TextButton stepModeBtn{"Step Sequencer"}, zoomOutH{"Zoom out"}, zoomInH{"Zoom in"}, zoomOutV{"Lower"}, zoomInV{"Taller"};
+    juce::Label zoomLabel{{}, "Zoom"};
+    void setStepMode(bool);
+    juce::Rectangle<int> toolbarArea;
     juce::TooltipWindow tooltips{this};
     std::unique_ptr<juce::FileChooser> chooser;
 #if !JUCE_MAC

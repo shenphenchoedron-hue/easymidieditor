@@ -8,16 +8,33 @@ namespace mc::gui {
 namespace {
 enum MenuId {
     New = 1, Open, Save, SaveAs, ImportMidi, ImportMusicXml, ExportMidi, ExportMusicXml, Quit,
-    Undo = 100, Redo, Cut, Copy, Paste, Delete, SelectAll, AddTrack, DeleteTrack,
+    Undo = 100, Redo, Cut, Copy, Paste, Delete, SelectAll, AddTrack, DeleteTrack, AddStepSeq,
     Settings = 200, Plugins, Rescan, SoundsFolder, Manual, About
 };
 const char* kProjectExt = "*.mcproj";
 }
 
 MainComponent::MainComponent(AppContext& a)
-    : app(a), transport(a), chordPanel(a), trackList(a), pianoRoll(a)
+    : app(a), transport(a), chordPanel(a), trackList(a), pianoRoll(a), stepSeq(a)
 {
-    for (juce::Component* c : std::initializer_list<juce::Component*>{&transport, &chordPanel, &trackList, &pianoRoll}) addAndMakeVisible(c);
+    for (juce::Component* c : std::initializer_list<juce::Component*>{&transport, &chordPanel, &trackList, &pianoRoll,
+                                                                      &stepModeBtn, &zoomLabel, &zoomOutH, &zoomInH, &zoomOutV, &zoomInV})
+        addAndMakeVisible(c);
+    addChildComponent(stepSeq);
+    stepModeBtn.setClickingTogglesState(true);
+    stepModeBtn.setTooltip("Switch between the piano roll and the step sequencer (S)");
+    stepModeBtn.onClick = [this] { setStepMode(stepModeBtn.getToggleState()); };
+    zoomLabel.setFont(theme::uiFont(13.5f, true));
+    zoomLabel.setColour(juce::Label::textColourId, theme::col::textDim);
+    zoomLabel.setJustificationType(juce::Justification::centredRight);
+    zoomOutH.setTooltip("Zoom out in time (-, Ctrl+wheel)");
+    zoomInH.setTooltip("Zoom in in time (+, Ctrl+wheel)");
+    zoomOutV.setTooltip("Smaller rows and keys (Alt+wheel)");
+    zoomInV.setTooltip("Taller rows and keys (Alt+wheel)");
+    zoomOutH.onClick = [this] { pianoRoll.zoomOutH(); };
+    zoomInH.onClick = [this] { pianoRoll.zoomInH(); };
+    zoomOutV.onClick = [this] { pianoRoll.zoomOutV(); };
+    zoomInV.onClick = [this] { pianoRoll.zoomInV(); };
 #if !JUCE_MAC
     addAndMakeVisible(menuBar);
 #else
@@ -55,12 +72,43 @@ void MainComponent::resized()
     r.removeFromTop(1);
     trackList.setBounds(r.removeFromLeft(290));
     r.removeFromLeft(1);
+    auto bar = r.removeFromTop(34);
+    r.removeFromTop(1);
+    {
+        auto b = bar.reduced(theme::gap, 5);
+        stepModeBtn.setBounds(b.removeFromLeft(150));
+        b.removeFromLeft(theme::gapGroup);
+        zoomLabel.setBounds(b.removeFromLeft(48));
+        b.removeFromLeft(theme::gapS);
+        for (auto* z : {&zoomOutH, &zoomInH, &zoomOutV, &zoomInV}) { z->setBounds(b.removeFromLeft(84)); b.removeFromLeft(theme::gapS); }
+    }
+    toolbarArea = bar;
     pianoRoll.setBounds(r);
+    stepSeq.setBounds(r);
+}
+
+void MainComponent::setStepMode(bool on)
+{
+    stepModeBtn.setToggleState(on, juce::dontSendNotification);
+    pianoRoll.setVisible(!on);
+    stepSeq.setVisible(on);
+    for (auto* z : {&zoomOutH, &zoomInH, &zoomOutV, &zoomInV}) z->setEnabled(!on);
+    zoomLabel.setEnabled(!on);
+    if (on && app.stepLines(stepSeq.shownGroup()).empty() && app.activeStepGroup() == 0) {
+        // nothing to show yet: insert the first step sequencer right away
+        bool any = false;
+        for (auto& t : app.project.tracks())
+            if (auto* m = dynamic_cast<model::MidiTrack*>(t.get()); m && m->isStepLine()) any = true;
+        if (!any) app.addStepSequencer();
+    }
+    repaint();
 }
 
 void MainComponent::paint(juce::Graphics& g)
 {
     g.fillAll(theme::col::border); // 1px seams between sections
+    g.setColour(theme::col::panel);
+    g.fillRect(toolbarArea);
 }
 
 void MainComponent::timerCallback()
@@ -91,6 +139,7 @@ bool MainComponent::keyPressed(const juce::KeyPress& k)
     if (cmd && k.getKeyCode() == 'O') { openDialog(); return true; }
     if (cmd && k.getKeyCode() == 'N') { menuItemSelected(New, 0); return true; }
     if (!cmd && k.getKeyCode() == 'R') { app.toggleRecord(); return true; }
+    if (!cmd && k.getKeyCode() == 'S') { setStepMode(!stepModeBtn.getToggleState()); return true; }
     if (!cmd && k.getKeyCode() == 'L') { app.setLoop(!app.project.loopEnabled, app.project.loopStart, app.project.loopEnd); return true; }
     if (!cmd && k.getKeyCode() == 'C') { auto& h = app.project.harmony; app.setHarmony(h.root, h.scaleId, !h.chordMode); return true; }
     return false;
@@ -124,6 +173,7 @@ juce::PopupMenu MainComponent::getMenuForIndex(int idx, const juce::String&)
         m.addItem(SelectAll, "Select all notes");
         m.addSeparator();
         m.addItem(AddTrack, "Add track");
+        m.addItem(AddStepSeq, "Add step sequencer track");
         m.addItem(DeleteTrack, "Delete active track", app.project.track(app.project.activeTrack) != nullptr);
     } else {
         m.addItem(Settings, "Settings (audio, MIDI, modifier keys)...");
@@ -157,6 +207,7 @@ void MainComponent::menuItemSelected(int id, int)
         case Delete: pianoRoll.deleteSelection(); break;
         case SelectAll: pianoRoll.selectAll(); break;
         case AddTrack: app.addTrack(); break;
+        case AddStepSeq: app.addStepSequencer(); setStepMode(true); break;
         case DeleteTrack: app.deleteTrack(app.project.activeTrack); break;
         case Settings: SettingsComponent::show(app); break;
         case Plugins: {

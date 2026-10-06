@@ -31,6 +31,12 @@ public:
     void zoomHorizontal(double factor, double anchorX);
     void zoomVertical(double factor, double anchorY);
     void scrollBy(double dxTicks, double dyPixels);
+    // Zoom around the centre of the visible grid (toolbar buttons / keys). The keyboard follows the row height.
+    void zoomInH()  { zoomHorizontal(1.25, gridCentre().x); }
+    void zoomOutH() { zoomHorizontal(1 / 1.25, gridCentre().x); }
+    void zoomInV()  { zoomVertical(1.2, gridCentre().y); }
+    void zoomOutV() { zoomVertical(1 / 1.2, gridCentre().y); }
+    juce::Point<double> gridCentre() const;
     void updateScrollbars();
 
     AppContext& app;

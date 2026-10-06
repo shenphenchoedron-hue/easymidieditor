@@ -323,6 +323,82 @@ void AppContext::addTrack()
     }
 }
 
+// ---------------------------------------------------------------- step sequencer
+namespace {
+struct DrumDefault { const char* name; int pitch; };
+constexpr DrumDefault kDrumDefaults[] = {{"Kick", 36}, {"Snare", 38}, {"Closed Hat", 42}, {"Open Hat", 46},
+                                         {"Clap", 39}, {"Low Tom", 45}, {"High Tom", 50}, {"Crash", 49}, {"Ride", 51}};
+}
+
+std::uint64_t AppContext::activeStepGroup() const
+{
+    auto* t = activeMidiTrack();
+    return t ? t->stepGroup : 0;
+}
+
+std::vector<model::MidiTrack*> AppContext::stepLines(std::uint64_t group) const
+{
+    std::vector<model::MidiTrack*> v;
+    if (group == 0) return v;
+    for (auto& t : project.tracks())
+        if (auto* m = dynamic_cast<model::MidiTrack*>(t.get()); m && m->stepGroup == group) v.push_back(m);
+    return v;
+}
+
+void AppContext::addStepSequencer()
+{
+    std::uint64_t group = 0;
+    for (auto& t : project.tracks())
+        if (auto* m = dynamic_cast<model::MidiTrack*>(t.get())) group = std::max(group, m->stepGroup);
+    addStepLine(group + 1);
+}
+
+void AppContext::addStepLine(std::uint64_t group)
+{
+    if (group == 0) return;
+    const auto existing = stepLines(group);
+    model::StepPattern pat;
+    if (!existing.empty()) {
+        const auto& f = existing.front()->step;
+        pat.numSteps = f.numSteps; pat.stepTicks = f.stepTicks; pat.repeats = f.repeats; pat.startTick = f.startTick;
+    }
+    const auto& def = kDrumDefaults[existing.size() % std::size(kDrumDefaults)];
+    pat.pitch = def.pitch;
+    pat.normalise();
+
+    auto cmd = std::make_unique<model::AddTrackCommand>("Step " + std::to_string(group) + ": " + def.name);
+    auto* raw = cmd.get();
+    undo.perform(std::move(cmd));
+    auto* t = project.midiTrack(raw->trackId());
+    if (!t) return;
+    t->stepGroup = group;
+    t->step = pat;
+    // Each line inherits the instrument of the previous line; the first one gets a drum kit.
+    if (!existing.empty()) t->plugin = existing.back()->plugin;
+    else {
+        t->plugin = defaultInstrument();
+        for (auto& i : plugins->plugins())
+            if (i.identifier == std::string(plugins::soundfont::kBuiltinPrefix) + "pop-drums") { t->plugin = plugins::PluginManager::referenceFor(i); break; }
+    }
+    t->plugin.stateBase64.clear();
+    t->colour = existing.empty() ? 0xffe08f4fu : existing.front()->colour;
+    t->regenerateStepNotes();
+    project.notifyChanged();
+}
+
+void AppContext::setStepPatterns(std::vector<model::SetStepPatternsCommand::Entry> after, const std::string& name)
+{
+    std::vector<model::SetStepPatternsCommand::Entry> before;
+    for (auto& [id, pat] : after) {
+        auto* t = project.midiTrack(id);
+        if (!t) return;
+        before.push_back({id, t->step});
+        pat.normalise();
+    }
+    if (before == after) return;
+    undo.perform(std::make_unique<model::SetStepPatternsCommand>(std::move(before), std::move(after), name));
+}
+
 void AppContext::deleteTrack(model::TrackId id)
 {
     if (project.track(id)) undo.perform(std::make_unique<model::RemoveTrackCommand>(id));

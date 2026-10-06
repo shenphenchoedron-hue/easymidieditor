@@ -299,7 +299,8 @@ public:
                 roll.selection = {hit->id};
             }
             anchorId = hit->id;
-            mode = (e.position.x > noteRect(*hit).getRight() - 6) ? Mode::Resize : Mode::Move;
+            const auto edge = edgeAt(*hit, e.position.x);
+            mode = edge > 0 ? Mode::Resize : edge < 0 ? Mode::ResizeLeft : Mode::Move;
             beginDrag(*track);
             app.previewNotes({hit->pitch}, hit->velocity, 200);
             repaint();
@@ -349,7 +350,7 @@ public:
             repaint();
             return;
         }
-        if (mode != Mode::Move && mode != Mode::Resize) return;
+        if (mode != Mode::Move && mode != Mode::Resize && mode != Mode::ResizeLeft) return;
         const double dtRaw = roll.xToTick(e.x) - downTick;
         const Note* anchor = nullptr;
         for (auto& o : original) if (o.id == anchorId) anchor = &o;
@@ -362,6 +363,18 @@ public:
             const int dp = juce::jlimit(-minPitch, 127 - maxPitch, roll.yToPitch(e.y) - downPitch);
             for (auto o : original) { o.start += dt; o.pitch += dp; track->updateNote(o); }
             if (dp != lastPreviewDp) { lastPreviewDp = dp; roll.app.previewNotes({anchor->pitch + dp}, anchor->velocity, 150); }
+        } else if (mode == Mode::ResizeLeft) {
+            // Drag the start edge: the end stays put, the note grows/shrinks to the left.
+            const Tick minLen = roll.app.snapEnabled ? std::max<Tick>(1, roll.gridTicks() / 4) : 1;
+            const Tick newStart = roll.snap((double)anchor->start + dtRaw);
+            Tick dt = newStart - anchor->start;
+            dt = std::max<Tick>(dt, -minStart);
+            for (auto o : original) {
+                const Tick end = o.end();
+                o.start = std::clamp<Tick>(o.start + dt, 0, end - minLen);
+                o.length = end - o.start;
+                track->updateNote(o);
+            }
         } else {
             const Tick newEnd = roll.snap((double)anchor->end() + dtRaw);
             const Tick dl = newEnd - anchor->end();
@@ -374,7 +387,7 @@ public:
         roll.app.modelChangedWithoutUndo();
     }
 
-    void mouseUp(const juce::MouseEvent&) override
+    void mouseUp(const juce::MouseEvent& e) override
     {
         auto* track = roll.app.activeMidiTrack();
         rubber.reset();
@@ -389,7 +402,7 @@ public:
             repaint();
             return;
         }
-        if (track && changed && (mode == Mode::Move || mode == Mode::Resize)) {
+        if (track && changed && (mode == Mode::Move || mode == Mode::Resize || mode == Mode::ResizeLeft)) {
             std::vector<Note> after;
             for (auto& o : original) if (auto* n = track->findNote(o.id)) after.push_back(*n);
             for (auto& o : original) track->updateNote(o); // restore, then apply through the undo stack
@@ -400,10 +413,33 @@ public:
         }
         mode = Mode::None;
         changed = false;
+        updateCursor(e.position);
         repaint();
     }
 
     void mouseDoubleClick(const juce::MouseEvent&) override {}
+
+    // Show a resize cursor when hovering over the left or right edge of a note.
+    void mouseMove(const juce::MouseEvent& e) override { updateCursor(e.position); }
+    void mouseExit(const juce::MouseEvent&) override { setMouseCursor(juce::MouseCursor::NormalCursor); }
+
+    void updateCursor(juce::Point<float> pos)
+    {
+        if (mode == Mode::Resize || mode == Mode::ResizeLeft) { setMouseCursor(juce::MouseCursor::LeftRightResizeCursor); return; }
+        const Note* hit = noteAt(pos);
+        setMouseCursor(hit && edgeAt(*hit, pos.x) != 0 ? juce::MouseCursor::LeftRightResizeCursor
+                                                       : juce::MouseCursor::NormalCursor);
+    }
+
+    // -1 = left edge, +1 = right edge, 0 = body. Edge zone shrinks for short notes.
+    int edgeAt(const Note& n, float x) const
+    {
+        const auto r = noteRect(n);
+        const float zone = juce::jlimit(2.0f, 7.0f, r.getWidth() / 3.0f);
+        if (x >= r.getRight() - zone) return 1;
+        if (x <= r.getX() + zone) return -1;
+        return 0;
+    }
 
     void mouseWheelMove(const juce::MouseEvent& e, const juce::MouseWheelDetails& w) override
     {
@@ -417,7 +453,7 @@ public:
     Tick lastLength = model::kPPQ / 2;
 
 private:
-    enum class Mode { None, Move, Resize, Rubber, RubberDelete };
+    enum class Mode { None, Move, Resize, ResizeLeft, Rubber, RubberDelete };
     std::set<model::NoteId> pendingDelete; // notes inside the right-drag delete box
     void beginDrag(const model::MidiTrack& t)
     {
@@ -585,6 +621,11 @@ void PianoRollComponent::zoomVertical(double f, double anchorY)
     repaint();
 }
 
+juce::Point<double> PianoRollComponent::gridCentre() const
+{
+    return {grid->getWidth() * 0.5, grid->getHeight() * 0.5};
+}
+
 void PianoRollComponent::scrollBy(double dx, double dy)
 {
     scrollX = std::max(0.0, scrollX + dx);
@@ -695,6 +736,9 @@ bool PianoRollComponent::keyPressed(const juce::KeyPress& k)
     if (cmd && k.getKeyCode() == 'C') { copySelection(); return true; }
     if (cmd && k.getKeyCode() == 'X') { copySelection(); deleteSelection(); return true; }
     if (cmd && k.getKeyCode() == 'V') { paste(); return true; }
+    // Zoom: + / - horizontal (time)
+    if (!cmd && (k.getTextCharacter() == '+' || k.getKeyCode() == juce::KeyPress::numberPadAdd)) { zoomInH(); return true; }
+    if (!cmd && (k.getTextCharacter() == '-' || k.getKeyCode() == juce::KeyPress::numberPadSubtract)) { zoomOutH(); return true; }
     if (!cmd && (k.getKeyCode() == juce::KeyPress::upKey || k.getKeyCode() == juce::KeyPress::downKey)) {
         auto* t = app.activeMidiTrack();
         if (!t || selection.empty()) return false;

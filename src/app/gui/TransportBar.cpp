@@ -21,7 +21,7 @@ TransportBar::TransportBar(AppContext& a) : app(a)
     theme::setStyle(toStart, theme::styleTransport);
     theme::setStyle(loopBtn, theme::styleTransport);
     for (auto* l : {&bpmLabel, &sigLabel, &loopLabel, &gridLabel}) {
-        l->setFont(theme::uiFont(12.0f));
+        l->setFont(theme::uiFont(13.5f, true));
         l->setColour(juce::Label::textColourId, theme::col::textDim);
         l->setJustificationType(juce::Justification::centredRight);
         l->setBorderSize({0, 0, 0, 2});

@@ -1,5 +1,6 @@
 #include "io/ProjectSerializer.h"
 #include "io/Json.h"
+#include <algorithm>
 #include <filesystem>
 #include <fstream>
 #include <sstream>
@@ -45,6 +46,14 @@ std::string ProjectSerializer::toString(const Project& p)
             for (auto& n : m->notes())
                 notes.push_back(Json::Array{(long long)n.start, (long long)n.length, n.pitch, n.velocity, n.channel});
             jt.set("notes", notes);
+            if (m->isStepLine()) {
+                Json::Array steps;
+                for (auto v : m->step.steps) steps.push_back((int)v);
+                jt.set("stepGroup", (long long)m->stepGroup);
+                jt.set("step", Json::Object{{"pitch", m->step.pitch}, {"numSteps", m->step.numSteps},
+                                            {"stepTicks", (long long)m->step.stepTicks}, {"repeats", m->step.repeats},
+                                            {"start", (long long)m->step.startTick}, {"steps", steps}});
+            }
         } else {
             jt.set("type", "audio");
         }
@@ -108,6 +117,18 @@ LoadResult ProjectSerializer::fromString(const std::string& text, Project& out)
                 n.velocity = (int)a[3].num(100);
                 n.channel = a.size() > 4 ? (int)a[4].num(-1) : -1;
                 m->addNote(n);
+            }
+            if (const auto g = (std::uint64_t)jt["stepGroup"].num(0); g > 0) {
+                auto& js = jt["step"];
+                m->stepGroup = g;
+                m->step.pitch = (int)js["pitch"].num(36);
+                m->step.numSteps = (int)js["numSteps"].num(16);
+                m->step.stepTicks = tick(js["stepTicks"], ppq / 4);
+                m->step.repeats = (int)js["repeats"].num(4);
+                m->step.startTick = tick(js["start"], 0);
+                m->step.steps.clear();
+                for (auto& v : js["steps"].arr()) m->step.steps.push_back((std::uint8_t)std::clamp((int)v.num(0), 0, 127));
+                m->regenerateStepNotes();
             }
             t = std::move(m);
         }

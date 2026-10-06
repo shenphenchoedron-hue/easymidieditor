@@ -36,7 +36,7 @@ ChordPanel::ChordPanel(AppContext& a) : app(a)
     nextLabel.setTooltip("Suggested next chords (circle of fifths). Click to hear one.");
     addChildComponent(nextLabel);
     for (auto* l : {&rootLabel, &scaleLabel, &modsLabel, &nextLabel}) {
-        l->setFont(theme::uiFont(12.0f));
+        l->setFont(theme::uiFont(13.5f, true));
         l->setColour(juce::Label::textColourId, theme::col::textDim);
         l->setJustificationType(juce::Justification::centredRight);
         l->setBorderSize({0, 0, 0, 2});
@@ -82,7 +82,7 @@ void ChordPanel::resized()
     r.removeFromLeft(gapS);
     for (size_t i = 0; i < nextBtns.size(); ++i) {
         auto& b = nextBtns[i];
-        const int w = std::max(44, (int)juce::GlyphArrangement::getStringWidth(theme::uiFont(14.0f), b.getButtonText()) + 20);
+        const int w = std::max(44, (int)juce::GlyphArrangement::getStringWidth(theme::uiFont(16.0f, true), b.getButtonText()) + 20);
         b.setBounds(r.getWidth() >= w ? r.removeFromLeft(w) : juce::Rectangle<int>());
         r.removeFromLeft(gapS);
     }

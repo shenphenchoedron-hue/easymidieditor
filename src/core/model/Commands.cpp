@@ -118,4 +118,12 @@ void TrackProperties::applyTo(Track& t) const
 void SetTrackPropertiesCommand::apply(Project& p)  { if (auto* t = p.track(id_)) after_.applyTo(*t); }
 void SetTrackPropertiesCommand::revert(Project& p) { if (auto* t = p.track(id_)) before_.applyTo(*t); }
 
+void SetStepPatternsCommand::set(Project& p, const std::vector<Entry>& v)
+{
+    for (auto& [id, pat] : v)
+        if (auto* t = p.midiTrack(id)) { t->step = pat; t->regenerateStepNotes(); }
+}
+void SetStepPatternsCommand::apply(Project& p)  { set(p, after_); }
+void SetStepPatternsCommand::revert(Project& p) { set(p, before_); }
+
 } // namespace mc::model

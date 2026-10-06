@@ -43,6 +43,35 @@ const Note* MidiTrack::findNote(NoteId id) const
     return nullptr;
 }
 
+void StepPattern::normalise()
+{
+    pitch = std::clamp(pitch, 0, 127);
+    numSteps = std::clamp(numSteps, 1, 64);
+    stepTicks = std::max<Tick>(1, stepTicks);
+    repeats = std::clamp(repeats, 1, 256);
+    startTick = std::max<Tick>(0, startTick);
+    steps.resize((size_t)numSteps, 0);
+    for (auto& v : steps) v = (std::uint8_t)std::min<int>(v, 127);
+}
+
+void MidiTrack::regenerateStepNotes()
+{
+    step.normalise();
+    notes_.clear();
+    nextId_ = 1;
+    const Tick len = std::max<Tick>(1, step.stepTicks - step.stepTicks / 8); // short gap between hits
+    for (int r = 0; r < step.repeats; ++r)
+        for (int i = 0; i < step.numSteps; ++i)
+            if (const int v = step.steps[(size_t)i]; v > 0) {
+                Note n;
+                n.pitch = step.pitch;
+                n.velocity = v;
+                n.start = step.startTick + ((Tick)r * step.numSteps + i) * step.stepTicks;
+                n.length = len;
+                addNote(n);
+            }
+}
+
 void MidiTrack::sort()
 {
     std::stable_sort(notes_.begin(), notes_.end(), [](const Note& a, const Note& b) {

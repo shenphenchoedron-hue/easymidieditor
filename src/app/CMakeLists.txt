@@ -24,6 +24,7 @@ target_sources(MidiComposer PRIVATE
     gui/TransportBar.cpp
     gui/TrackListComponent.cpp
     gui/PianoRollComponent.cpp
+    gui/StepSequencerComponent.cpp
     gui/ChordPanel.cpp
     gui/PluginBrowser.cpp
     gui/SettingsComponent.cpp

@@ -145,6 +145,66 @@ private:
 };
 } // namespace
 
+void showInstrumentMenu(AppContext& app, model::TrackId id, juce::Component& target)
+{
+    auto* t = app.project.midiTrack(id);
+    if (!t) return;
+    juce::PopupMenu m;
+    const auto& list = app.plugins->plugins();
+    auto isCurrent = [&](const plugins::PluginInfo& p) { return p.format == t->plugin.format && p.identifier == t->plugin.identifier; };
+
+    // Internal: built-in band instruments grouped Rock / Pop / Jazz, then Basic Synth.
+    // SoundFont: the user's own .sf2 files, one sub-menu per file.
+    // Everything else (VST3, AU, LV2, CLAP): one sub-menu per format.
+    juce::PopupMenu internal, userSounds;
+    std::map<std::string, juce::PopupMenu> groups, files, byFormat;
+    for (size_t i = 0; i < list.size(); ++i) {
+        const auto& p = list[i];
+        const int itemId = (int)i + 1000;
+        if (p.format == plugins::InternalPluginHost::kFormat) {
+            if (p.category == "Rock" || p.category == "Pop" || p.category == "Jazz")
+                groups[p.category].addItem(itemId, juce::String(p.name), true, isCurrent(p));
+            else
+                internal.addItem(itemId, juce::String(p.name), true, isCurrent(p));
+        } else if (p.format == plugins::soundfont::kUserFormat) {
+            files[p.category].addItem(itemId, juce::String(p.name), true, isCurrent(p));
+        } else {
+            byFormat[p.format].addItem(itemId, juce::String(p.name) + "  (" + juce::String(p.manufacturer) + ")", true, isCurrent(p));
+        }
+    }
+    juce::PopupMenu internalMenu;
+    for (const char* g : {"Rock", "Pop", "Jazz"})
+        if (groups.count(g)) internalMenu.addSubMenu(g, groups[g]);
+    if (internal.getNumItems() > 0) { internalMenu.addSeparator(); for (juce::PopupMenu::MenuItemIterator it(internal); it.next();) internalMenu.addItem(it.getItem()); }
+    m.addSubMenu("Internal", internalMenu);
+
+    for (auto& [file, sub] : files) userSounds.addSubMenu(juce::String(file), sub);
+    if (!files.empty()) userSounds.addSeparator();
+    userSounds.addItem(5, "Open Sounds folder (add .sf2 files)...");
+    m.addSubMenu("SoundFonts", userSounds);
+
+    for (auto& [fmt, sub] : byFormat) m.addSubMenu(juce::String(fmt), sub);
+    m.addSeparator();
+    m.addItem(1, "Browse plugins...");
+    m.addSeparator();
+    auto* inst = app.engine->instrument(id);
+    m.addItem(2, "Open editor", inst && inst->hasEditor());
+    m.addItem(3, "Bypass", !t->plugin.empty(), t->plugin.bypassed);
+    m.addItem(4, "Remove instrument", !t->plugin.empty());
+    m.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(&target), [&ctx = app, tid = id](int r) {
+        if (r == 0) return;
+        if (r >= 1000) {
+            auto& l = ctx.plugins->plugins();
+            if ((size_t)(r - 1000) < l.size()) { auto info = l[(size_t)(r - 1000)]; ctx.setTrackPlugin(tid, &info); }
+        } else if (r == 1) {
+            PluginBrowser::show(ctx, [&ctx, tid](const plugins::PluginInfo& i) { ctx.setTrackPlugin(tid, &i); });
+        } else if (r == 2) ctx.openPluginEditor(tid);
+        else if (r == 3) { if (auto* tr = ctx.project.midiTrack(tid)) ctx.setTrackBypass(tid, !tr->plugin.bypassed); }
+        else if (r == 4) ctx.setTrackPlugin(tid, nullptr);
+        else if (r == 5) ctx.openSoundsFolder();
+    });
+}
+
 class TrackListComponent::Row final : public juce::Component {
 public:
     Row(AppContext& a, model::TrackId i) : app(a), id(i)
@@ -293,65 +353,7 @@ private:
     void showPluginMenu()
     {
         app.selectTrack(id);
-        auto* t = app.project.midiTrack(id);
-        if (!t) return;
-        juce::PopupMenu m;
-        const auto& list = app.plugins->plugins();
-        auto isCurrent = [&](const plugins::PluginInfo& p) { return p.format == t->plugin.format && p.identifier == t->plugin.identifier; };
-
-        // Internal: built-in band instruments grouped Rock / Pop / Jazz, then Basic Synth.
-        // SoundFont: the user's own .sf2 files, one sub-menu per file.
-        // Everything else (VST3, AU, LV2, CLAP): one sub-menu per format.
-        juce::PopupMenu internal, userSounds;
-        std::map<std::string, juce::PopupMenu> groups, files, byFormat;
-        for (size_t i = 0; i < list.size(); ++i) {
-            const auto& p = list[i];
-            const int itemId = (int)i + 1000;
-            if (p.format == plugins::InternalPluginHost::kFormat) {
-                if (p.category == "Rock" || p.category == "Pop" || p.category == "Jazz")
-                    groups[p.category].addItem(itemId, juce::String(p.name), true, isCurrent(p));
-                else
-                    internal.addItem(itemId, juce::String(p.name), true, isCurrent(p));
-            } else if (p.format == plugins::soundfont::kUserFormat) {
-                files[p.category].addItem(itemId, juce::String(p.name), true, isCurrent(p));
-            } else {
-                byFormat[p.format].addItem(itemId, juce::String(p.name) + "  (" + juce::String(p.manufacturer) + ")", true, isCurrent(p));
-            }
-        }
-        juce::PopupMenu internalMenu;
-        for (const char* g : {"Rock", "Pop", "Jazz"})
-            if (groups.count(g)) internalMenu.addSubMenu(g, groups[g]);
-        if (internal.getNumItems() > 0) { internalMenu.addSeparator(); for (juce::PopupMenu::MenuItemIterator it(internal); it.next();) internalMenu.addItem(it.getItem()); }
-        m.addSubMenu("Internal", internalMenu);
-
-        for (auto& [file, sub] : files) userSounds.addSubMenu(juce::String(file), sub);
-        if (!files.empty()) userSounds.addSeparator();
-        userSounds.addItem(5, "Open Sounds folder (add .sf2 files)...");
-        m.addSubMenu("SoundFonts", userSounds);
-
-        for (auto& [fmt, sub] : byFormat) m.addSubMenu(juce::String(fmt), sub);
-        m.addSeparator();
-        m.addItem(1, "Browse plugins...");
-        m.addSeparator();
-        auto* inst = app.engine->instrument(id);
-        m.addItem(2, "Open editor", inst && inst->hasEditor());
-        m.addItem(3, "Bypass", !t->plugin.empty(), t->plugin.bypassed);
-        m.addItem(4, "Remove instrument", !t->plugin.empty());
-        juce::Component::SafePointer<Row> self(this);
-        m.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(&pluginBtn), [self](int r) {
-            if (!self || r == 0) return;
-            auto& ctx = self->app;
-            const auto tid = self->id;
-            if (r >= 1000) {
-                auto& l = ctx.plugins->plugins();
-                if ((size_t)(r - 1000) < l.size()) { auto info = l[(size_t)(r - 1000)]; ctx.setTrackPlugin(tid, &info); }
-            } else if (r == 1) {
-                PluginBrowser::show(ctx, [&ctx, tid](const plugins::PluginInfo& i) { ctx.setTrackPlugin(tid, &i); });
-            } else if (r == 2) ctx.openPluginEditor(tid);
-            else if (r == 3) { if (auto* tr = ctx.project.midiTrack(tid)) ctx.setTrackBypass(tid, !tr->plugin.bypassed); }
-            else if (r == 4) ctx.setTrackPlugin(tid, nullptr);
-            else if (r == 5) ctx.openSoundsFolder();
-        });
+        showInstrumentMenu(app, id, pluginBtn);
     }
 
     struct Swatch final : juce::Button {
@@ -411,7 +413,7 @@ void TrackListComponent::paint(juce::Graphics& g)
     g.setColour(theme::col::borderSoft);
     g.drawHorizontalLine(33, 0.0f, (float)getWidth());
     g.setColour(theme::col::textDim);
-    g.setFont(theme::uiFont(11.0f, true));
+    g.setFont(theme::uiFont(13.0f, true));
     g.drawText("TRACKS", theme::gap + 4, 0, 60, 34, juce::Justification::centredLeft);
 }
 

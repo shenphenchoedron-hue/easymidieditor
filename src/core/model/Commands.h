@@ -122,4 +122,19 @@ private:
     TrackProperties before_, after_;
 };
 
+// Edits one or more step sequencer lines; their notes are regenerated.
+class SetStepPatternsCommand : public Command {
+public:
+    using Entry = std::pair<TrackId, StepPattern>;
+    SetStepPatternsCommand(std::vector<Entry> before, std::vector<Entry> after, std::string name = "Edit steps")
+        : before_(std::move(before)), after_(std::move(after)), name_(std::move(name)) {}
+    void apply(Project&) override;
+    void revert(Project&) override;
+    std::string name() const override { return name_; }
+private:
+    static void set(Project&, const std::vector<Entry>&);
+    std::vector<Entry> before_, after_;
+    std::string name_;
+};
+
 } // namespace mc::model
