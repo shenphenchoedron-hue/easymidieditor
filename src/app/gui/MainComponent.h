@@ -42,11 +42,18 @@ private:
     TrackListComponent trackList;
     PianoRollComponent pianoRoll;
     StepSequencerComponent stepSeq;
-    // view toolbar above the editor: Piano roll / Step sequencer mode + zoom
-    juce::TextButton stepModeBtn{"Step Sequencer"}, zoomOutH{"Zoom out"}, zoomInH{"Zoom in"}, zoomOutV{"Lower"}, zoomInV{"Taller"};
+    // toolbar above the piano roll: zoom
+    juce::TextButton zoomOutH{"Zoom out"}, zoomInH{"Zoom in"}, zoomOutV{"Lower"}, zoomInV{"Taller"};
     juce::Label zoomLabel{{}, "Zoom"};
-    void setStepMode(bool);
     juce::Rectangle<int> toolbarArea;
+    // Track list + piano roll + step sequencers form one page that scrolls vertically:
+    // step sequencers are placed after the piano roll and never shrink it.
+    struct Page final : juce::Component {
+        juce::Rectangle<int> toolbar;
+        void paint(juce::Graphics&) override;
+    };
+    juce::Viewport page;
+    Page pageContent;
     juce::TooltipWindow tooltips{this};
     std::unique_ptr<juce::FileChooser> chooser;
 #if !JUCE_MAC

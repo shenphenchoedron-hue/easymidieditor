@@ -122,6 +122,18 @@ private:
     TrackProperties before_, after_;
 };
 
+// Several commands performed and undone as one step.
+class CompoundCommand : public Command {
+public:
+    CompoundCommand(std::vector<std::unique_ptr<Command>> c, std::string name) : cmds_(std::move(c)), name_(std::move(name)) {}
+    void apply(Project& p) override { for (auto& c : cmds_) c->apply(p); }
+    void revert(Project& p) override { for (auto it = cmds_.rbegin(); it != cmds_.rend(); ++it) (*it)->revert(p); }
+    std::string name() const override { return name_; }
+private:
+    std::vector<std::unique_ptr<Command>> cmds_;
+    std::string name_;
+};
+
 // Edits one or more step sequencer lines; their notes are regenerated.
 class SetStepPatternsCommand : public Command {
 public:

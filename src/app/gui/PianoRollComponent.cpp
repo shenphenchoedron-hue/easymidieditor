@@ -9,10 +9,10 @@ using model::Note;
 using model::Tick;
 
 namespace {
-constexpr int kKeyboardWidth = 64;
+constexpr int kKeyboardWidth = PianoRollComponent::kKeyboardWidth;
 constexpr int kTimelineHeight = 26;
 constexpr int kVelocityHeight = 64;
-constexpr int kScrollbar = 10;
+constexpr int kScrollbar = PianoRollComponent::kScrollbarWidth;
 
 bool isBlackKey(int p) { const int pc = p % 12; return pc == 1 || pc == 3 || pc == 6 || pc == 8 || pc == 10; }
 
@@ -196,7 +196,7 @@ public:
         // tracing paper at the layers below. Not clickable.
         const auto bounds = getLocalBounds().toFloat();
         for (auto& t : p.tracks())
-            if (auto* mt = dynamic_cast<model::MidiTrack*>(t.get()); mt && mt->id() != p.activeTrack) {
+            if (auto* mt = dynamic_cast<model::MidiTrack*>(t.get()); mt && mt->id() != p.activeTrack && !mt->isStepLine()) {
                 const auto ghost = trackNoteColour(*mt).withMultipliedSaturation(0.6f); // muted: not the active track
                 for (auto& n : mt->notes()) {
                     const auto r = noteRect(n).reduced(0.5f, 1.0f);
@@ -610,6 +610,7 @@ void PianoRollComponent::zoomHorizontal(double f, double anchorX)
     scrollX = std::max(0.0, t - anchorX / pxPerTick);
     updateScrollbars();
     repaint();
+    if (onViewChanged) onViewChanged();
 }
 
 void PianoRollComponent::zoomVertical(double f, double anchorY)
@@ -632,6 +633,7 @@ void PianoRollComponent::scrollBy(double dx, double dy)
     scrollY += dy;
     updateScrollbars();
     repaint();
+    if (dx != 0 && onViewChanged) onViewChanged();
 }
 
 void PianoRollComponent::updateScrollbars()
@@ -655,6 +657,7 @@ void PianoRollComponent::scrollBarMoved(juce::ScrollBar* bar, double start)
 {
     if (bar == &hbar) scrollX = start; else scrollY = start;
     repaint();
+    if (bar == &hbar && onViewChanged) onViewChanged();
 }
 
 void PianoRollComponent::changeListenerCallback(juce::ChangeBroadcaster*)
@@ -676,7 +679,7 @@ void PianoRollComponent::refreshPlayhead()
     lastPlayheadPos = pos;
     if (app.engine->isPlaying() || jumped) {
         const double visT = grid->getWidth() / pxPerTick;
-        if (pos > scrollX + visT * 0.95 || pos < scrollX) { scrollX = std::max(0.0, pos - visT * 0.05); updateScrollbars(); grid->repaint(); timeline->repaint(); velocity->repaint(); }
+        if (pos > scrollX + visT * 0.95 || pos < scrollX) { scrollX = std::max(0.0, pos - visT * 0.05); updateScrollbars(); grid->repaint(); timeline->repaint(); velocity->repaint(); if (onViewChanged) onViewChanged(); }
     }
     const double x = tickToX(pos);
     if (x != lastPlayheadX || app.isRecording()) {

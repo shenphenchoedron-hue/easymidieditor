@@ -51,13 +51,24 @@ struct PluginReference {
 // the piano roll see ordinary notes.
 struct StepPattern {
     int pitch = 36;                  // note played by this line
-    int numSteps = 16;               // steps per pattern
-    Tick stepTicks = kPPQ / 4;       // 1/16 by default
-    int repeats = 4;                 // pattern is repeated this many times
+    Tick stepTicks = kPPQ / 4;       // step length, 1/16 by default
+    Tick barTicks = 4 * kPPQ;        // bar length (from the time signature when edited)
+    int bars = 1;                    // length; every bar has its own steps (no repetition)
     Tick startTick = 0;
-    std::vector<std::uint8_t> steps; // velocity per step, 0 = off (size == numSteps)
+    std::vector<std::uint8_t> steps; // velocity per step, 0 = off, size == totalSteps()
+
+    Tick lengthTicks() const { return (Tick)bars * barTicks; }
+    int totalSteps() const { return (int)((lengthTicks() + stepTicks - 1) / stepTicks); }
+    Tick stepStart(int i) const { return startTick + (Tick)i * stepTicks; }
+    int barOfStep(int i) const { return (int)((Tick)i * stepTicks / barTicks); }
 
     void normalise();                // clamps values and resizes steps
+    void setStepTicks(Tick t);       // keeps the rhythm (steps move to the nearest new step)
+    void setBars(int n);             // new bars start empty
+    void copyBar(int from, int to);  // overwrite bar `to` with bar `from`
+    void clearBar(int b);
+    void duplicateBar(int b);        // insert a copy of bar b after it
+    void deleteBar(int b);
     bool operator==(const StepPattern&) const = default;
 };
 

@@ -55,7 +55,7 @@ GRID = colors.HexColor("#c9d3db")
 
 def sym(text):
     """Wrap symbols Arial lacks in the Unicode font."""
-    return re.sub(r"([♯♭→←↑↓↔⌘⌥⇧])", lambda m: f'<font name="{SYM}">{m.group(1)}</font>', text)
+    return re.sub(r"([♯♭→←↑↓↔▾▸⌘⌥⇧])", lambda m: f'<font name="{SYM}">{m.group(1)}</font>', text)
 
 
 st = {
@@ -223,17 +223,18 @@ def content_da():
 
     # ---- 4
     h1("4. Vinduet")
-    p("Vinduet består af seks dele, oppefra og ned:")
+    p("Vinduet består af disse dele, oppefra og ned:")
     table(["Del", "Hvad den gør"], [
         ["Menulinje", "<b>File</b> (projekter, import/eksport), <b>Edit</b> (fortryd, kopiér, spor) og <b>Options</b> "
                       "(indstillinger, plugins, lyde, manual, om programmet). På Mac ligger menuen øverst på skærmen."],
         ["Transportlinje", "Afspil, stop, optag, loop, tempo, taktart, nodegrid og fortryd."],
         ["Akkordpanel", "Grundtone, skala, akkordtilstand, modifier-knapper, den aktuelle akkord og forslag til næste akkord."],
         ["Sporliste (venstre)", "Alle spor med navn, farve, mute/solo, lydstyrke, panorering, kanal og instrument."],
-        ["Visningslinje", "Over editoren: knappen <b>Step Sequencer</b> skifter mellem piano roll og step sequencer "
-                          "(kapitel 9), og <b>Zoom</b>-knapperne zoomer i piano roll."],
+        ["Zoomlinje", "Over piano roll: <b>Zoom</b>-knapperne (kapitel 8)."],
         ["Piano roll (højre)", "Tonerne på det aktive spor, med tidslinje øverst, klaviatur til venstre og "
                                "velocity-felt (anslagsstyrke) nederst."],
+        ["Step sequencere (nederst)", "Alle step sequencer-spor, under piano roll og altid synlige: opsætningskortet "
+                                      "til venstre, trinrækkerne på linje med piano roll-gitteret (kapitel 9)."],
     ], [38, 127])
 
     # ---- 5
@@ -260,7 +261,8 @@ def content_da():
     # ---- 6
     h1("6. Spor")
     h2("Tilføj og slet")
-    p("Brug <b>Edit → Add track</b> og <b>Edit → Delete active track</b>. Klik på et spor i sporlisten for at gøre det aktivt "
+    p("Klik <b>+ Track</b> og vælg <b>Piano roll</b> eller <b>Step sequencer</b> (findes også i Edit-menuen). "
+      "<b>- Track</b> eller <b>Edit → Delete active track</b> sletter det aktive piano roll-spor. Klik på et spor i sporlisten for at gøre det aktivt "
       "– det er det spor, du ser og redigerer i piano roll, og som MIDI-keyboardet spiller på.")
     h2("Indstillinger pr. spor")
     table(["Element", "Funktion"], [
@@ -373,39 +375,57 @@ def content_da():
 
     # ---- 9
     h1("9. Step sequencer")
-    p("Step sequenceren er en hurtig måde at bygge trommerytmer og andre gentagne mønstre på. En step sequencer "
-      "indsættes som et spor og bygges op af <b>linjer</b>. Hver linje spiller én tone med sit eget instrument, fx "
-      "stortromme, lilletromme og hi-hat, eller en bastone på et basinstrument.")
+    p("Step sequenceren er en hurtig måde at bygge trommerytmer og andre gentagne mønstre på. Et step sequencer-spor "
+      "bygges op af <b>linjer</b>. Hver linje spiller én tone med sit eget instrument, fx stortromme, lilletromme og "
+      "hi-hat, eller en bastone på et basinstrument.")
+    p("Alle step sequencere vises <b>under piano roll</b> og er altid synlige. Trinrækkerne følger piano roll-gitteret "
+      "– samme takter, rulning og zoom – så du kan se præcis, hvor rytmen ligger under dine toner. Piano roll beholder "
+      "sin størrelse: den første step sequencer vises lige under den, og flere step sequencere kommer nedenunder – "
+      "brug rullebjælken yderst til højre i vinduet for at rulle ned til dem.")
     h2("Kom i gang")
     steps([
-        "Klik <b>Step Sequencer</b> i linjen over editoren (eller tryk <b>S</b>). Piano roll skiftes ud med step "
-        "sequenceren. Har projektet ingen endnu, indsættes en med en <b>Kick</b>-linje på Pop Drums.",
-        "Klik <b>+ Line</b> for at tilføje flere linjer. Nye linjer foreslår Snare, Closed Hat, Open Hat, Clap osv. og "
-        "bruger samme instrument som linjen over.",
-        "Klik på trinnene for at tænde dem. Tryk <b>mellemrum</b> for at afspille – det aktuelle trin har en rød ramme.",
+        "Klik <b>+ Track</b> i sporlisten og vælg <b>Step sequencer</b> (eller <b>Edit → Add step sequencer track</b>). "
+        "Den vises under piano roll med en <b>Kick</b>-linje på Pop Drums.",
+        "Klik <b>+ Line</b> på kortet for at tilføje flere linjer. Nye linjer foreslår Snare, Closed Hat, Open Hat, Clap "
+        "osv. og bruger samme instrument som linjen over.",
+        "Klik på trinnene for at tænde dem. Tryk <b>mellemrum</b> for at afspille – den røde afspilningslinje løber "
+        "gennem piano roll og trinrækkerne på samme tid.",
     ])
-    p("<b>+ New step sequencer</b> (eller <b>Edit → Add step sequencer track</b>) indsætter endnu en step sequencer. "
-      "Vælg hvilken der vises i listen ved siden af titlen. Klik <b>Step Sequencer</b> igen for at komme tilbage til piano roll.")
+    h2("Kortet")
+    p("Opsætningen af hver step sequencer sidder på dens kort i venstre kolonne:")
+    table(["Indstilling", "Virkning"], [
+        ["<b>▾ / ▸</b>", "Klapper step sequenceren sammen til den øverste række (eller folder den ud igen)."],
+        ["Farveprik", "Klik for at vælge step sequencerens farve – praktisk, når du har flere."],
+        ["<b>+ Line</b>", "Tilføjer en linje."],
+        ["<b>X</b> (øverst)", "Sletter hele step sequenceren med alle linjer (kan fortrydes)."],
+        ["<b>Step</b>", "Længden af hvert trin: 1/4, 1/8, 1/16, 1/32 eller trioler. Med 1/16 har en 4/4-takt 16 trin. "
+                        "Ændrer du den, bevares rytmen så vidt muligt."],
+        ["<b>Bars</b>", "Step sequencerens længde i takter. <b>Hver takt har sine egne trin</b> – du kan ændre én "
+                        "takt uden at påvirke de andre. Nye takter starter tomme."],
+        ["<b>Start</b>", "Den takt i sangen, hvor step sequenceren starter."],
+    ], [38, 127])
+    h2("Arbejd med takter")
+    p("Bjælken over trinrækkerne viser hver takt (<b>Bar 1</b>, <b>Bar 2</b> ...). <b>Højreklik</b> på en takt dér "
+      "for disse kommandoer (de gælder alle linjer):")
+    table(["Kommando", "Virkning"], [
+        ["<b>Copy to next bar</b>", "Kopierer takten over i den næste – en hurtig start på en variation."],
+        ["<b>Duplicate bar</b>", "Indsætter en kopi af takten lige efter den."],
+        ["<b>Add empty bar after</b>", "Indsætter en tom takt efter den."],
+        ["<b>Clear bar</b>", "Slukker alle trin i takten."],
+        ["<b>Delete bar</b>", "Fjerner takten; de efterfølgende takter rykker til venstre."],
+    ], [45, 120])
     h2("En linje")
     table(["Del", "Hvad den gør"], [
         ["Navn", "Dobbeltklik for at omdøbe linjen."],
         ["Instrumentknap", "Vælg linjens instrument – samme menu som i sporlisten (kapitel 7)."],
-        ["Tone", "Den tone, linjen spiller. For trommesæt: C1 stortromme, D1 lilletromme, F♯1 lukket hi-hat, A♯1 åben hi-hat."],
-        ["<b>M</b>", "Slå linjen fra (mute)."],
-        ["<b>X</b>", "Slet linjen (kan fortrydes)."],
+        ["<b>M</b> / <b>X</b>", "Slå linjen fra (mute) / slet linjen (kan fortrydes)."],
+        ["Tone", "Under klaviaturet: den tone, linjen spiller. For trommesæt: C2 stortromme, D2 lilletromme, F♯2 lukket "
+                 "hi-hat, A♯2 åben hi-hat."],
         ["Trin", "<b>Klik</b> = til/fra. <b>Shift+klik</b> = accent (kraftigere). <b>Højreklik</b> = fra. "
                  "<b>Træk</b> hen over flere trin for at tænde eller slukke dem alle."],
     ], [38, 127])
-    h2("Indstillinger for hele step sequenceren")
-    table(["Indstilling", "Virkning"], [
-        ["<b>Steps</b>", "Antal trin i mønsteret (4–64)."],
-        ["<b>Step</b>", "Længden af hvert trin: 1/4, 1/8, 1/16, 1/32 eller trioler. 16 trin à 1/16 = én takt i 4/4."],
-        ["<b>Repeat</b>", "Hvor mange gange mønsteret spilles."],
-        ["<b>Start bar</b>", "Den takt, step sequenceren starter i."],
-    ], [38, 127])
-    tip("Hver linje er også et almindeligt spor i sporlisten med lydstyrke, panorering, mute/solo og farve. Tonerne "
-        "laves ud fra mønsteret, så de afspilles, eksporteres til MIDI og vises i piano roll som alle andre toner. "
-        "Ret dem i step sequenceren – ændringer i piano roll erstattes, næste gang mønsteret ændres.")
+    tip("Tonerne laves ud fra mønsteret, så de afspilles og eksporteres til MIDI som alle andre toner. "
+        "<b>⌘/Ctrl+rul</b> over trinrækkerne zoomer i tid, <b>Shift+rul</b> ruller i tid – piano roll følger med.")
 
     # ---- 10
     h1("10. Akkordtilstand")
@@ -496,7 +516,6 @@ def content_da():
         ["R", "Optag til/fra"],
         ["L", "Loop til/fra"],
         ["C", "Akkordtilstand til/fra"],
-        ["S", "Piano roll / step sequencer"],
         ["+ / -", "Zoom ind / ud i tid (piano roll)"],
         ["⌘/Ctrl+Z", "Fortryd"],
         ["⌘/Ctrl+Shift+Z eller ⌘/Ctrl+Y", "Gentag"],

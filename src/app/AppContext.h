@@ -54,6 +54,8 @@ public:
     // ---- step sequencer (a group of MidiTracks, one per line)
     void addStepSequencer();                       // new group with one line, becomes active
     void addStepLine(std::uint64_t group);         // new line (track) in an existing group
+    void deleteStepSequencer(std::uint64_t group); // all its lines, one undo step
+    std::vector<std::uint64_t> stepGroups() const; // in track order
     std::uint64_t activeStepGroup() const;         // group of the active track, 0 if none
     std::vector<model::MidiTrack*> stepLines(std::uint64_t group) const;
     void setStepPatterns(std::vector<model::SetStepPatternsCommand::Entry> after, const std::string& name = "Edit steps");
@@ -86,6 +88,7 @@ public:
     // ---- live note input (any thread): from MIDI keyboard or on-screen keyboard
     void handleKeyboardNote(bool on, int pitch, int velocity);
     void previewNotes(const std::vector<int>& pitches, int velocity, int durationMs); // GUI: audition inserted notes
+    void previewOnTrack(model::TrackId, int pitch, int velocity, int durationMs);       // audition a step sequencer line
 
     // Call after modifying the model without a command (e.g. live drag).
     void modelChangedWithoutUndo() { project.notifyChanged(); }
@@ -113,6 +116,7 @@ private:
     std::map<model::TrackId, juce::String> errors;
     std::map<model::TrackId, std::unique_ptr<juce::DocumentWindow>> editorWindows;
     int listenerHandle = 0;
+    model::TrackId lastPianoTrack = 0; // the piano roll never edits step sequencer lines
     bool dirty = false;
     bool suppressDirty = false;
 };

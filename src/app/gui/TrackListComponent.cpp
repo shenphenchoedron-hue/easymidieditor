@@ -15,9 +15,11 @@ constexpr int kRowHeight = 80;
 // The colour is previewed live; closing the picker records one undo step.
 class TrackColourPicker final : public juce::Component, private juce::ChangeListener {
 public:
-    TrackColourPicker(AppContext& a, model::TrackId i) : app(a), id(i)
+    // All tracks in `ids` get the colour (a step sequencer colours all its lines).
+    TrackColourPicker(AppContext& a, std::vector<model::TrackId> i) : app(a), ids(std::move(i)), id(ids.empty() ? 0 : ids.front())
     {
         if (auto* t = app.project.track(id)) before = model::TrackProperties::from(*t);
+        for (auto x : ids) if (auto* t = app.project.track(x)) befores.push_back({x, model::TrackProperties::from(*t)});
         swatches = app.settings.colourSwatches();
 
         selector.setCurrentColour(before.colour ? juce::Colour(before.colour) : theme::trackPalette[0].second, juce::dontSendNotification);
@@ -44,12 +46,16 @@ public:
     {
         selector.removeChangeListener(this);
         // Turn the live preview into a single undoable change.
-        auto* t = app.project.track(id);
-        if (!t) return;
-        auto after = model::TrackProperties::from(*t);
-        if (after.colour == before.colour) return;
-        before.applyTo(*t);
-        app.undo.perform(std::make_unique<model::SetTrackPropertiesCommand>(id, before, after));
+        std::vector<std::unique_ptr<model::Command>> cmds;
+        for (auto& [x, b] : befores)
+            if (auto* t = app.project.track(x)) {
+                auto after = model::TrackProperties::from(*t);
+                if (after.colour == b.colour) continue;
+                b.applyTo(*t);
+                cmds.push_back(std::make_unique<model::SetTrackPropertiesCommand>(x, b, after));
+            }
+        if (cmds.size() == 1) app.undo.perform(std::move(cmds.front()));
+        else if (!cmds.empty()) app.undo.perform(std::make_unique<model::CompoundCommand>(std::move(cmds), "Change colour"));
     }
 
     void paint(juce::Graphics& g) override
@@ -125,17 +131,19 @@ private:
     }
     void apply(std::uint32_t argb)
     {
-        if (auto* t = app.project.track(id); t && t->colour != argb) {
-            t->colour = argb;
-            app.project.notifyChanged();
-        }
+        bool changed = false;
+        for (auto x : ids)
+            if (auto* t = app.project.track(x); t && t->colour != argb) { t->colour = argb; changed = true; }
+        if (changed) app.project.notifyChanged();
         repaint();
     }
     void changeListenerCallback(juce::ChangeBroadcaster*) override { apply(selector.getCurrentColour().withAlpha(1.0f).getARGB()); }
 
     AppContext& app;
+    std::vector<model::TrackId> ids;
     model::TrackId id;
     model::TrackProperties before;
+    std::vector<std::pair<model::TrackId, model::TrackProperties>> befores;
     std::vector<std::uint32_t> swatches;
     juce::ColourSelector selector{juce::ColourSelector::showColourAtTop | juce::ColourSelector::showSliders |
                                   juce::ColourSelector::showColourspace | juce::ColourSelector::editableColour};
@@ -144,6 +152,12 @@ private:
     int presetTop = 0, savedTop = 0;
 };
 } // namespace
+
+void showTrackColourPicker(AppContext& app, std::vector<model::TrackId> ids, juce::Component& target)
+{
+    if (ids.empty()) return;
+    juce::CallOutBox::launchAsynchronously(std::make_unique<TrackColourPicker>(app, std::move(ids)), target.getScreenBounds(), nullptr);
+}
 
 void showInstrumentMenu(AppContext& app, model::TrackId id, juce::Component& target)
 {
@@ -346,8 +360,7 @@ private:
     void showColourMenu()
     {
         app.selectTrack(id);
-        auto picker = std::make_unique<TrackColourPicker>(app, id);
-        juce::CallOutBox::launchAsynchronously(std::move(picker), colourBtn.getScreenBounds(), nullptr);
+        showTrackColourPicker(app, {id}, colourBtn);
     }
 
     void showPluginMenu()
@@ -391,7 +404,19 @@ TrackListComponent::TrackListComponent(AppContext& a) : app(a)
     addAndMakeVisible(viewport);
     viewport.setViewedComponent(&content, false);
     viewport.setScrollBarsShown(true, false);
-    addBtn.onClick = [this] { app.addTrack(); };
+    addBtn.setTooltip("Add a piano roll track or a step sequencer track");
+    addBtn.onClick = [this] {
+        juce::PopupMenu m;
+        m.addSectionHeader("New track");
+        m.addItem(1, "Piano roll");
+        m.addItem(2, "Step sequencer");
+        juce::Component::SafePointer<TrackListComponent> self(this);
+        m.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(&addBtn), [self](int r) {
+            if (!self) return;
+            if (r == 1) self->app.addTrack();
+            else if (r == 2) self->app.addStepSequencer();
+        });
+    };
     delBtn.onClick = [this] {
         const auto id = app.project.activeTrack;
         auto* t = app.project.track(id);
@@ -434,7 +459,9 @@ void TrackListComponent::changeListenerCallback(juce::ChangeBroadcaster*) { rebu
 void TrackListComponent::rebuild()
 {
     std::vector<model::TrackId> ids;
-    for (auto& t : app.project.tracks()) if (t->kind() == model::TrackKind::Midi) ids.push_back(t->id());
+    // Step sequencer lines have their own cards in the step sequencer panel.
+    for (auto& t : app.project.tracks())
+        if (auto* m = dynamic_cast<model::MidiTrack*>(t.get()); m && !m->isStepLine()) ids.push_back(t->id());
     bool same = ids.size() == rows.size();
     for (size_t i = 0; same && i < ids.size(); ++i) same = rows[i]->trackId() == ids[i];
     if (!same) {

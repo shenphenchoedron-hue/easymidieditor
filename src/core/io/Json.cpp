@@ -1,4 +1,5 @@
 #include "io/Json.h"
+#include <charconv>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -105,10 +106,13 @@ struct Parser {
         if (lit("true")) return true;
         if (lit("false")) return false;
         if (lit("null")) return nullptr;
-        char* end = nullptr;
-        double d = std::strtod(s.c_str() + i, &end);
-        if (end == s.c_str() + i) fail("bad value");
-        i = (size_t)(end - s.c_str());
+        // from_chars ignores the C locale (strtod would expect "0,5" in e.g. Danish).
+        const char* b = s.data() + i;
+        if (*b == '+') ++b;
+        double d = 0;
+        const auto [end, ec] = std::from_chars(b, s.data() + s.size(), d);
+        if (ec != std::errc() || end == b) fail("bad value");
+        i = (size_t)(end - s.data());
         return d;
     }
 };
@@ -144,7 +148,11 @@ void Json::dumpImpl(std::string& out, int indent, int level) const
     else if (auto* b = std::get_if<bool>(&v_)) out += *b ? "true" : "false";
     else if (auto* d = std::get_if<double>(&v_)) {
         if (std::isfinite(*d) && *d == std::floor(*d) && std::fabs(*d) < 9e15) out += std::to_string((long long)*d);
-        else { char b[32]; std::snprintf(b, sizeof b, "%.17g", std::isfinite(*d) ? *d : 0.0); out += b; }
+        else { // locale independent, always '.' as decimal separator
+            char b[32];
+            const auto r = std::to_chars(b, b + sizeof b, std::isfinite(*d) ? *d : 0.0);
+            out.append(b, r.ptr);
+        }
     }
     else if (auto* s = std::get_if<std::string>(&v_)) escape(out, *s);
     else if (auto* a = std::get_if<Array>(&v_)) {

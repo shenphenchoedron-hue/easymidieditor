@@ -94,17 +94,18 @@ def content_en(m):
 
     # ---- 4
     h1("4. The window")
-    p("The window has six parts, from top to bottom:")
+    p("The window has these parts, from top to bottom:")
     table(["Part", "What it does"], [
         ["Menu bar", "<b>File</b> (projects, import/export), <b>Edit</b> (undo, copy, tracks) and <b>Options</b> "
                      "(settings, plugins, sounds, manual, about). On a Mac the menu is at the top of the screen."],
         ["Transport bar", "Play, stop, record, loop, tempo, time signature, note grid and undo."],
         ["Chord panel", "Root, scale, chord mode, modifier buttons, the current chord and next-chord suggestions."],
         ["Track list (left)", "All tracks with name, colour, mute/solo, volume, pan, channel and instrument."],
-        ["View toolbar", "Above the editor: the <b>Step Sequencer</b> button switches between the piano roll and the "
-                         "step sequencer (chapter 9), and the <b>Zoom</b> buttons zoom the piano roll."],
+        ["Zoom bar", "Above the piano roll: the <b>Zoom</b> buttons (chapter 8)."],
         ["Piano roll (right)", "The notes of the active track, with the timeline on top, the keyboard on the left and "
                                "the velocity lane at the bottom."],
+        ["Step sequencers (bottom)", "Every step sequencer track, below the piano roll and always visible: the setup card "
+                                     "on the left, the step rows aligned with the piano roll grid (chapter 9)."],
     ], [38, 127])
 
     # ---- 5
@@ -131,7 +132,8 @@ def content_en(m):
     # ---- 6
     h1("6. Tracks")
     h2("Adding and deleting")
-    p("Use <b>Edit → Add track</b> and <b>Edit → Delete active track</b>. Click a track in the track list to make it "
+    p("Click <b>+ Track</b> and choose <b>Piano roll</b> or <b>Step sequencer</b> (also in the Edit menu). "
+      "<b>- Track</b> or <b>Edit → Delete active track</b> deletes the active piano roll track. Click a track in the track list to make it "
       "active – that is the track you see and edit in the piano roll, and the one your MIDI keyboard plays.")
     h2("Track settings")
     table(["Element", "Function"], [
@@ -247,39 +249,57 @@ def content_en(m):
 
     # ---- 9
     h1("9. Step sequencer")
-    p("The step sequencer is a quick way to build drum beats and other repeating patterns. A step sequencer is "
-      "inserted as a track and is built from <b>lines</b>. Each line plays one note with its own instrument, e.g. "
-      "kick, snare and hi-hat, or a bass note on a bass instrument.")
+    p("The step sequencer is a quick way to build drum beats and other repeating patterns. A step sequencer track is "
+      "built from <b>lines</b>. Each line plays one note with its own instrument, e.g. kick, snare and hi-hat, or a "
+      "bass note on a bass instrument.")
+    p("All step sequencers are shown <b>below the piano roll</b> and are always visible. Their step rows follow the "
+      "piano roll grid – same bars, scroll and zoom – so you can see exactly where the rhythm falls under your notes. "
+      "The piano roll keeps its size: the first step sequencer is shown just below it, and further step sequencers "
+      "follow underneath – use the scrollbar on the far right of the window to scroll down to them.")
     h2("Getting started")
     steps([
-        "Click <b>Step Sequencer</b> in the toolbar above the editor (or press <b>S</b>). The piano roll is replaced "
-        "by the step sequencer. If the project has none yet, one is inserted with a <b>Kick</b> line on Pop Drums.",
-        "Click <b>+ Line</b> to add more lines. New lines suggest Snare, Closed Hat, Open Hat, Clap and so on, and use "
-        "the same instrument as the line above.",
-        "Click the steps to switch them on. Press <b>Space</b> to play – the current step is outlined in red.",
+        "Click <b>+ Track</b> in the track list and choose <b>Step sequencer</b> (or <b>Edit → Add step sequencer "
+        "track</b>). It appears below the piano roll with a <b>Kick</b> line on Pop Drums.",
+        "Click <b>+ Line</b> on its card to add more lines. New lines suggest Snare, Closed Hat, Open Hat, Clap and so "
+        "on, and use the same instrument as the line above.",
+        "Click the steps to switch them on. Press <b>Space</b> to play – the red playhead runs through the piano roll "
+        "and the step rows together.",
     ])
-    p("<b>+ New step sequencer</b> (or <b>Edit → Add step sequencer track</b>) inserts another step sequencer. Choose "
-      "which one to show in the drop-down next to the title. Click <b>Step Sequencer</b> again to return to the piano roll.")
+    h2("The card")
+    p("The setup of each step sequencer is on its card in the left column:")
+    table(["Setting", "Effect"], [
+        ["<b>▾ / ▸</b>", "Collapses the step sequencer to its top row (or expands it again)."],
+        ["Colour dot", "Click to choose the colour of the step sequencer – handy when you have several."],
+        ["<b>+ Line</b>", "Adds a line."],
+        ["<b>X</b> (top)", "Deletes the whole step sequencer with all lines (can be undone)."],
+        ["<b>Step</b>", "Length of each step: 1/4, 1/8, 1/16, 1/32 or triplets. With 1/16 a 4/4 bar has 16 steps. "
+                        "Changing it keeps your rhythm where possible."],
+        ["<b>Bars</b>", "Length of the step sequencer in bars. <b>Every bar has its own steps</b> – change one bar "
+                        "without affecting the others. New bars start empty."],
+        ["<b>Start</b>", "The bar of the song where the step sequencer starts."],
+    ], [38, 127])
+    h2("Working with bars")
+    p("The strip above the step rows shows each bar (<b>Bar 1</b>, <b>Bar 2</b> ...). <b>Right-click</b> a bar there "
+      "for these commands (they apply to all lines):")
+    table(["Command", "Effect"], [
+        ["<b>Copy to next bar</b>", "Copies the bar onto the following bar – a quick start for a variation."],
+        ["<b>Duplicate bar</b>", "Inserts a copy of the bar right after it."],
+        ["<b>Add empty bar after</b>", "Inserts an empty bar after it."],
+        ["<b>Clear bar</b>", "Switches off all steps in the bar."],
+        ["<b>Delete bar</b>", "Removes the bar; the following bars move left."],
+    ], [45, 120])
     h2("A line")
     table(["Part", "What it does"], [
         ["Name", "Double-click to rename the line."],
         ["Instrument button", "Choose the line's instrument – the same menu as in the track list (chapter 7)."],
-        ["Note", "The note the line plays. For drum kits: C1 kick, D1 snare, F♯1 closed hi-hat, A♯1 open hi-hat."],
-        ["<b>M</b>", "Mute the line."],
-        ["<b>X</b>", "Delete the line (can be undone)."],
+        ["<b>M</b> / <b>X</b>", "Mute the line / delete the line (can be undone)."],
+        ["Note", "Under the piano keyboard: the note the line plays. For drum kits: C2 kick, D2 snare, F♯2 closed "
+                 "hi-hat, A♯2 open hi-hat."],
         ["Steps", "<b>Click</b> = on/off. <b>Shift+click</b> = accent (louder). <b>Right-click</b> = off. "
                   "<b>Drag</b> across several steps to switch them all on or off."],
     ], [38, 127])
-    h2("Settings for the whole step sequencer")
-    table(["Setting", "Effect"], [
-        ["<b>Steps</b>", "Number of steps in the pattern (4–64)."],
-        ["<b>Step</b>", "Length of each step: 1/4, 1/8, 1/16, 1/32 or triplets. 16 steps of 1/16 = one bar in 4/4."],
-        ["<b>Repeat</b>", "How many times the pattern is played."],
-        ["<b>Start bar</b>", "The bar where the step sequencer starts."],
-    ], [38, 127])
-    tip("Every line is also an ordinary track in the track list, with volume, pan, mute/solo and colour. The notes are "
-        "generated from the pattern, so they play, export to MIDI and show in the piano roll like any other notes. "
-        "Edit them in the step sequencer – changes made in the piano roll are replaced the next time the pattern changes.")
+    tip("The notes are generated from the pattern, so they play and export to MIDI like any other notes. "
+        "<b>⌘/Ctrl+scroll</b> over the step rows zooms the time axis, <b>Shift+scroll</b> scrolls it – the piano roll follows.")
 
     # ---- 10
     h1("10. Chord mode")
@@ -371,7 +391,6 @@ def content_en(m):
         ["R", "Record on/off"],
         ["L", "Loop on/off"],
         ["C", "Chord mode on/off"],
-        ["S", "Piano roll / step sequencer"],
         ["+ / -", "Zoom in / out in time (piano roll)"],
         ["⌘/Ctrl+Z", "Undo"],
         ["⌘/Ctrl+Shift+Z or ⌘/Ctrl+Y", "Redo"],

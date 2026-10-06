@@ -50,8 +50,8 @@ std::string ProjectSerializer::toString(const Project& p)
                 Json::Array steps;
                 for (auto v : m->step.steps) steps.push_back((int)v);
                 jt.set("stepGroup", (long long)m->stepGroup);
-                jt.set("step", Json::Object{{"pitch", m->step.pitch}, {"numSteps", m->step.numSteps},
-                                            {"stepTicks", (long long)m->step.stepTicks}, {"repeats", m->step.repeats},
+                jt.set("step", Json::Object{{"pitch", m->step.pitch}, {"stepTicks", (long long)m->step.stepTicks},
+                                            {"barTicks", (long long)m->step.barTicks}, {"bars", m->step.bars},
                                             {"start", (long long)m->step.startTick}, {"steps", steps}});
             }
         } else {
@@ -122,12 +122,27 @@ LoadResult ProjectSerializer::fromString(const std::string& text, Project& out)
                 auto& js = jt["step"];
                 m->stepGroup = g;
                 m->step.pitch = (int)js["pitch"].num(36);
-                m->step.numSteps = (int)js["numSteps"].num(16);
-                m->step.stepTicks = tick(js["stepTicks"], ppq / 4);
-                m->step.repeats = (int)js["repeats"].num(4);
+                m->step.stepTicks = std::max<Tick>(1, tick(js["stepTicks"], ppq / 4));
                 m->step.startTick = tick(js["start"], 0);
-                m->step.steps.clear();
-                for (auto& v : js["steps"].arr()) m->step.steps.push_back((std::uint8_t)std::clamp((int)v.num(0), 0, 127));
+                std::vector<std::uint8_t> steps;
+                for (auto& v : js["steps"].arr()) steps.push_back((std::uint8_t)std::clamp((int)v.num(0), 0, 127));
+                const Tick bar = (Tick)p.timeSig.numerator * kPPQ * 4 / std::max(1, p.timeSig.denominator);
+                if (js["bars"].isNull()) {
+                    // 0.3.0 test format: one pattern of numSteps repeated `repeats` times -> independent bars
+                    const int numSteps = std::max(1, (int)js["numSteps"].num((double)steps.size()));
+                    const int repeats = std::max(1, (int)js["repeats"].num(1));
+                    steps.resize((size_t)numSteps, 0);
+                    std::vector<std::uint8_t> all;
+                    for (int r = 0; r < repeats; ++r) all.insert(all.end(), steps.begin(), steps.end());
+                    m->step.barTicks = bar;
+                    const Tick len = (Tick)all.size() * m->step.stepTicks;
+                    m->step.bars = (int)std::max<Tick>(1, (len + bar - 1) / bar);
+                    m->step.steps = std::move(all);
+                } else {
+                    m->step.barTicks = std::max<Tick>(1, tick(js["barTicks"], (double)bar * ppq / kPPQ));
+                    m->step.bars = (int)js["bars"].num(1);
+                    m->step.steps = std::move(steps);
+                }
                 m->regenerateStepNotes();
             }
             t = std::move(m);

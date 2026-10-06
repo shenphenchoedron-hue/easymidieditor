@@ -61,6 +61,16 @@ AppContext::~AppContext()
 // ---------------------------------------------------------------- model sync
 void AppContext::onModelChanged()
 {
+    // Step sequencer lines are edited in the step sequencer panel, not the piano roll:
+    // keep a piano roll track active (e.g. after adding a line, or undo/redo).
+    if (auto* a = project.midiTrack(project.activeTrack); a && a->isStepLine()) {
+        model::TrackId pick = 0;
+        if (auto* l = project.midiTrack(lastPianoTrack); l && !l->isStepLine()) pick = lastPianoTrack;
+        else for (auto& t : project.tracks())
+            if (auto* m = dynamic_cast<model::MidiTrack*>(t.get()); m && !m->isStepLine()) { pick = m->id(); break; }
+        project.activeTrack = pick;
+    }
+    if (project.midiTrack(project.activeTrack)) lastPianoTrack = project.activeTrack;
     if (!suppressDirty) dirty = true;
     syncEngine();
     sendChangeMessage();
@@ -360,13 +370,16 @@ void AppContext::addStepLine(std::uint64_t group)
     model::StepPattern pat;
     if (!existing.empty()) {
         const auto& f = existing.front()->step;
-        pat.numSteps = f.numSteps; pat.stepTicks = f.stepTicks; pat.repeats = f.repeats; pat.startTick = f.startTick;
+        pat.stepTicks = f.stepTicks; pat.barTicks = f.barTicks; pat.bars = f.bars; pat.startTick = f.startTick;
+    } else {
+        pat.barTicks = seq::ticksPerBar(project.timeSig);
+        pat.bars = 1;
     }
     const auto& def = kDrumDefaults[existing.size() % std::size(kDrumDefaults)];
     pat.pitch = def.pitch;
     pat.normalise();
 
-    auto cmd = std::make_unique<model::AddTrackCommand>("Step " + std::to_string(group) + ": " + def.name);
+    auto cmd = std::make_unique<model::AddTrackCommand>(def.name);
     auto* raw = cmd.get();
     undo.perform(std::move(cmd));
     auto* t = project.midiTrack(raw->trackId());
@@ -384,6 +397,32 @@ void AppContext::addStepLine(std::uint64_t group)
     t->colour = existing.empty() ? 0xffe08f4fu : existing.front()->colour;
     t->regenerateStepNotes();
     project.notifyChanged();
+}
+
+std::vector<std::uint64_t> AppContext::stepGroups() const
+{
+    std::vector<std::uint64_t> v;
+    for (auto& t : project.tracks())
+        if (auto* m = dynamic_cast<model::MidiTrack*>(t.get()); m && m->isStepLine() && std::find(v.begin(), v.end(), m->stepGroup) == v.end())
+            v.push_back(m->stepGroup);
+    return v;
+}
+
+void AppContext::deleteStepSequencer(std::uint64_t group)
+{
+    std::vector<std::unique_ptr<model::Command>> cmds;
+    for (auto* t : stepLines(group)) cmds.push_back(std::make_unique<model::RemoveTrackCommand>(t->id()));
+    if (!cmds.empty()) undo.perform(std::make_unique<model::CompoundCommand>(std::move(cmds), "Delete step sequencer"));
+}
+
+void AppContext::previewOnTrack(model::TrackId track, int pitch, int velocity, int ms)
+{
+    auto* t = project.midiTrack(track);
+    if (!t) return;
+    const int ch = t->channel + 1;
+    engine->pushLive(track, juce::MidiMessage::noteOn(ch, pitch, (juce::uint8)velocity));
+    auto* eng = engine.get();
+    juce::Timer::callAfterDelay(ms, [eng, track, ch, pitch] { eng->pushLive(track, juce::MidiMessage::noteOff(ch, pitch)); });
 }
 
 void AppContext::setStepPatterns(std::vector<model::SetStepPatternsCommand::Entry> after, const std::string& name)
@@ -407,6 +446,7 @@ void AppContext::deleteTrack(model::TrackId id)
 void AppContext::selectTrack(model::TrackId id)
 {
     if (project.activeTrack == id) return;
+    if (auto* t = project.midiTrack(id); t && t->isStepLine()) return; // not editable in the piano roll
     for (auto& e : chordInput.allNotesOff()) engine->pushLive(activeTrackAtomic, juce::MidiMessage::noteOff(activeChannelAtomic + 1, e.pitch));
     project.activeTrack = id;
     suppressDirty = true;

@@ -12,6 +12,8 @@ public:
     explicit PianoRollComponent(AppContext&);
     ~PianoRollComponent() override;
 
+    static constexpr int kKeyboardWidth = 64, kScrollbarWidth = 10;
+    std::function<void()> onViewChanged; // scroll/zoom changed (the step sequencer panel follows the grid)
     void resized() override;
     void paint(juce::Graphics&) override;
     bool keyPressed(const juce::KeyPress&) override;

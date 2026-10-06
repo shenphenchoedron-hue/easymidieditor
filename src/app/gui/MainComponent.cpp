@@ -15,15 +15,18 @@ const char* kProjectExt = "*.mcproj";
 }
 
 MainComponent::MainComponent(AppContext& a)
-    : app(a), transport(a), chordPanel(a), trackList(a), pianoRoll(a), stepSeq(a)
+    : app(a), transport(a), chordPanel(a), trackList(a), pianoRoll(a), stepSeq(a, pianoRoll)
 {
-    for (juce::Component* c : std::initializer_list<juce::Component*>{&transport, &chordPanel, &trackList, &pianoRoll,
-                                                                      &stepModeBtn, &zoomLabel, &zoomOutH, &zoomInH, &zoomOutV, &zoomInV})
+    for (juce::Component* c : std::initializer_list<juce::Component*>{&transport, &chordPanel, &page})
         addAndMakeVisible(c);
-    addChildComponent(stepSeq);
-    stepModeBtn.setClickingTogglesState(true);
-    stepModeBtn.setTooltip("Switch between the piano roll and the step sequencer (S)");
-    stepModeBtn.onClick = [this] { setStepMode(stepModeBtn.getToggleState()); };
+    for (juce::Component* c : std::initializer_list<juce::Component*>{&trackList, &pianoRoll, &stepSeq,
+                                                                      &zoomLabel, &zoomOutH, &zoomInH, &zoomOutV, &zoomInV})
+        pageContent.addAndMakeVisible(c);
+    page.setViewedComponent(&pageContent, false);
+    page.setScrollBarsShown(true, false);
+    page.setScrollBarThickness(12);
+    pianoRoll.onViewChanged = [this] { stepSeq.viewChanged(); };
+    stepSeq.onHeightChanged = [this] { resized(); };
     zoomLabel.setFont(theme::uiFont(13.5f, true));
     zoomLabel.setColour(juce::Label::textColourId, theme::col::textDim);
     zoomLabel.setJustificationType(juce::Justification::centredRight);
@@ -70,45 +73,43 @@ void MainComponent::resized()
     transport.setBounds(r.removeFromTop(44));
     chordPanel.setBounds(r.removeFromTop(40));
     r.removeFromTop(1);
-    trackList.setBounds(r.removeFromLeft(290));
-    r.removeFromLeft(1);
-    auto bar = r.removeFromTop(34);
-    r.removeFromTop(1);
+    page.setBounds(r);
+    const int viewH = r.getHeight();
+    const int stepsH = stepSeq.preferredHeight();
+    // The piano roll keeps its height; only the first step sequencer peeks in below it.
+    const int peek = stepsH > 0 ? std::min(stepSeq.firstBlockHeight(), (int)(viewH * 0.35)) + 1 : 0;
+    const int topH = std::max(260, viewH - peek);
+    const int totalH = topH + (stepsH > 0 ? 1 + stepsH : 0);
+    const int w = totalH > viewH ? r.getWidth() - page.getScrollBarThickness() : r.getWidth();
+    pageContent.setSize(w, totalH);
+
+    auto top = juce::Rectangle<int>(0, 0, w, topH);
+    stepSeq.cardWidth = 290 + 1;
+    stepSeq.setBounds(stepsH > 0 ? juce::Rectangle<int>(0, topH + 1, w, stepsH) : juce::Rectangle<int>());
+    trackList.setBounds(top.removeFromLeft(290));
+    top.removeFromLeft(1);
+    auto bar = top.removeFromTop(34);
+    top.removeFromTop(1);
     {
         auto b = bar.reduced(theme::gap, 5);
-        stepModeBtn.setBounds(b.removeFromLeft(150));
-        b.removeFromLeft(theme::gapGroup);
         zoomLabel.setBounds(b.removeFromLeft(48));
         b.removeFromLeft(theme::gapS);
         for (auto* z : {&zoomOutH, &zoomInH, &zoomOutV, &zoomInV}) { z->setBounds(b.removeFromLeft(84)); b.removeFromLeft(theme::gapS); }
     }
-    toolbarArea = bar;
-    pianoRoll.setBounds(r);
-    stepSeq.setBounds(r);
+    pageContent.toolbar = bar;
+    pianoRoll.setBounds(top);
 }
 
-void MainComponent::setStepMode(bool on)
+void MainComponent::Page::paint(juce::Graphics& g)
 {
-    stepModeBtn.setToggleState(on, juce::dontSendNotification);
-    pianoRoll.setVisible(!on);
-    stepSeq.setVisible(on);
-    for (auto* z : {&zoomOutH, &zoomInH, &zoomOutV, &zoomInV}) z->setEnabled(!on);
-    zoomLabel.setEnabled(!on);
-    if (on && app.stepLines(stepSeq.shownGroup()).empty() && app.activeStepGroup() == 0) {
-        // nothing to show yet: insert the first step sequencer right away
-        bool any = false;
-        for (auto& t : app.project.tracks())
-            if (auto* m = dynamic_cast<model::MidiTrack*>(t.get()); m && m->isStepLine()) any = true;
-        if (!any) app.addStepSequencer();
-    }
-    repaint();
+    g.fillAll(theme::col::border); // 1px seams between sections
+    g.setColour(theme::col::panel);
+    g.fillRect(toolbar);
 }
 
 void MainComponent::paint(juce::Graphics& g)
 {
     g.fillAll(theme::col::border); // 1px seams between sections
-    g.setColour(theme::col::panel);
-    g.fillRect(toolbarArea);
 }
 
 void MainComponent::timerCallback()
@@ -116,6 +117,7 @@ void MainComponent::timerCallback()
     transport.refreshPosition();
     chordPanel.refreshDisplay();
     pianoRoll.refreshPlayhead();
+    stepSeq.refreshPlayhead();
 }
 
 void MainComponent::changeListenerCallback(juce::ChangeBroadcaster*)
@@ -139,7 +141,6 @@ bool MainComponent::keyPressed(const juce::KeyPress& k)
     if (cmd && k.getKeyCode() == 'O') { openDialog(); return true; }
     if (cmd && k.getKeyCode() == 'N') { menuItemSelected(New, 0); return true; }
     if (!cmd && k.getKeyCode() == 'R') { app.toggleRecord(); return true; }
-    if (!cmd && k.getKeyCode() == 'S') { setStepMode(!stepModeBtn.getToggleState()); return true; }
     if (!cmd && k.getKeyCode() == 'L') { app.setLoop(!app.project.loopEnabled, app.project.loopStart, app.project.loopEnd); return true; }
     if (!cmd && k.getKeyCode() == 'C') { auto& h = app.project.harmony; app.setHarmony(h.root, h.scaleId, !h.chordMode); return true; }
     return false;
@@ -172,7 +173,7 @@ juce::PopupMenu MainComponent::getMenuForIndex(int idx, const juce::String&)
         m.addItem(Delete, "Delete notes");
         m.addItem(SelectAll, "Select all notes");
         m.addSeparator();
-        m.addItem(AddTrack, "Add track");
+        m.addItem(AddTrack, "Add piano roll track");
         m.addItem(AddStepSeq, "Add step sequencer track");
         m.addItem(DeleteTrack, "Delete active track", app.project.track(app.project.activeTrack) != nullptr);
     } else {
@@ -207,7 +208,7 @@ void MainComponent::menuItemSelected(int id, int)
         case Delete: pianoRoll.deleteSelection(); break;
         case SelectAll: pianoRoll.selectAll(); break;
         case AddTrack: app.addTrack(); break;
-        case AddStepSeq: app.addStepSequencer(); setStepMode(true); break;
+        case AddStepSeq: app.addStepSequencer(); break;
         case DeleteTrack: app.deleteTrack(app.project.activeTrack); break;
         case Settings: SettingsComponent::show(app); break;
         case Plugins: {

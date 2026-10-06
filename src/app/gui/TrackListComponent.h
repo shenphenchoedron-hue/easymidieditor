@@ -5,6 +5,8 @@ namespace mc::gui {
 
 // Instrument popup (Internal / SoundFonts / plugin formats / editor / bypass) for one track.
 void showInstrumentMenu(AppContext&, model::TrackId, juce::Component& target);
+// Colour picker call-out; every track in the list gets the colour (one undo step).
+void showTrackColourPicker(AppContext&, std::vector<model::TrackId>, juce::Component& target);
 
 class TrackListComponent final : public juce::Component, private juce::ChangeListener {
 public:

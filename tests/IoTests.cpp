@@ -1,4 +1,5 @@
 #include "Test.h"
+#include <clocale>
 #include "io/Json.h"
 #include "io/MidiFile.h"
 #include "io/ProjectSerializer.h"
@@ -101,33 +102,93 @@ TEST(midi_file_rejects_garbage)
     CHECK(!io::MidiFile::read({1, 2, 3}, q).ok);
 }
 
-TEST(step_sequencer_pattern_generates_notes_and_roundtrips)
+TEST(step_sequencer_bars_are_independent_and_roundtrip)
 {
     Project p;
     auto& t = p.addMidiTrack("Kick");
     t.stepGroup = 1;
     t.step.pitch = 36;
-    t.step.numSteps = 8;
-    t.step.repeats = 2;
-    t.step.steps = {100, 0, 0, 0, 90, 0, 0, 0};
+    t.step.bars = 2;                       // 2 bars of 16 x 1/16
+    t.step.normalise();
+    CHECK_EQ(t.step.totalSteps(), 32);
+    t.step.steps[0] = 100; t.step.steps[4] = 90;   // bar 1
+    t.step.steps[16 + 8] = 110;                    // bar 2: different
     t.regenerateStepNotes();
-    CHECK_EQ(t.notes().size(), (size_t)4);
-    CHECK_EQ(t.notes()[1].start, (Tick)(4 * kPPQ / 4));
-    CHECK_EQ(t.notes()[2].start, (Tick)(8 * kPPQ / 4));
-    CHECK_EQ(t.notes()[1].velocity, 90);
+    CHECK_EQ(t.notes().size(), (size_t)3);
+    CHECK_EQ(t.notes()[2].start, (Tick)((16 + 8) * kPPQ / 4));
 
     Project q;
     CHECK(io::ProjectSerializer::fromString(io::ProjectSerializer::toString(p), q).ok);
     auto* l = q.midiTrack(t.id());
     CHECK(l && l->isStepLine());
-    if (l) { CHECK(l->step == t.step); CHECK_EQ(l->notes().size(), (size_t)4); }
+    if (l) { CHECK(l->step == t.step); CHECK_EQ(l->notes().size(), (size_t)3); }
 
     UndoStack undo(p);
     auto after = t.step;
     after.steps[2] = 127;
     undo.perform(std::make_unique<SetStepPatternsCommand>(std::vector<SetStepPatternsCommand::Entry>{{t.id(), t.step}},
                                                           std::vector<SetStepPatternsCommand::Entry>{{t.id(), after}}));
-    CHECK_EQ(p.midiTrack(t.id())->notes().size(), (size_t)6);
-    undo.undo();
     CHECK_EQ(p.midiTrack(t.id())->notes().size(), (size_t)4);
+    undo.undo();
+    CHECK_EQ(p.midiTrack(t.id())->notes().size(), (size_t)3);
+}
+
+TEST(step_sequencer_bar_operations)
+{
+    StepPattern s;
+    s.bars = 2;
+    s.normalise();
+    s.steps[0] = 100; s.steps[16 + 3] = 50;
+    s.duplicateBar(0);                     // bars: A, A, B
+    CHECK_EQ(s.bars, 3);
+    CHECK_EQ((int)s.steps[16], 100);
+    CHECK_EQ((int)s.steps[32 + 3], 50);
+    s.steps[16 + 2] = 70;                  // vary bar 2 only
+    CHECK_EQ((int)s.steps[2], 0);
+    s.clearBar(0);
+    CHECK_EQ((int)s.steps[0], 0);
+    CHECK_EQ((int)s.steps[16], 100);
+    s.deleteBar(0);                        // bars: A', B
+    CHECK_EQ(s.bars, 2);
+    CHECK_EQ((int)s.steps[0], 100);
+    CHECK_EQ((int)s.steps[2], 70);
+    CHECK_EQ((int)s.steps[16 + 3], 50);
+    s.copyBar(1, 0);
+    CHECK_EQ((int)s.steps[3], 50);
+    CHECK_EQ((int)s.steps[0], 0);
+    s.setStepTicks(kPPQ / 8);              // 1/32: rhythm kept
+    CHECK_EQ(s.totalSteps(), 64);
+    CHECK_EQ((int)s.steps[6], 50);
+}
+
+TEST(step_sequencer_old_format_is_converted_to_bars)
+{
+    const std::string old = R"({"format":"midicomposer-project","version":1,"ppq":960,"timeSignature":{"numerator":4,"denominator":4},
+        "tracks":[{"id":1,"name":"Kick","type":"midi","stepGroup":1,
+        "step":{"pitch":36,"numSteps":16,"stepTicks":240,"repeats":3,"start":0,"steps":[100,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]}}]})";
+    Project q;
+    CHECK(io::ProjectSerializer::fromString(old, q).ok);
+    auto* l = q.midiTrack(1);
+    CHECK(l != nullptr);
+    if (l) {
+        CHECK_EQ(l->step.bars, 3);
+        CHECK_EQ(l->notes().size(), (size_t)3);
+        CHECK_EQ((int)l->step.steps[32], 100);
+    }
+}
+
+TEST(json_numbers_ignore_c_locale)
+{
+    // GTK sets the locale from the environment; with e.g. da_DK, strtod/printf use ','.
+    const char* old = std::setlocale(LC_NUMERIC, nullptr);
+    const std::string saved = old ? old : "C";
+    if (std::setlocale(LC_NUMERIC, "da_DK.UTF-8") || std::setlocale(LC_NUMERIC, "de_DE.UTF-8")) {
+        const auto j = io::Json::parse("{\"a\": 120, \"b\": 0.8}");
+        CHECK_EQ(j["a"].num(0), 120.0);
+        CHECK_EQ(j["b"].num(0), 0.8);
+        io::Json o;
+        o.set("v", 0.25);
+        CHECK(o.dump(0).find("0.25") != std::string::npos);
+    }
+    std::setlocale(LC_NUMERIC, saved.c_str());
 }
